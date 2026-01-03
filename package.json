@@ -1,0 +1,27 @@
+{
+  "name": "exness",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "start:api": "cd apps/api-service && pnpm start",
+    "start:engine": "cd apps/engine-service && pnpm start",
+    "start:price-poller": "cd apps/price-poller-service && pnpm start",
+    "dev:api": "cd apps/api-service && pnpm dev",
+    "dev:engine": "cd apps/engine-service && pnpm dev",
+    "dev:price-poller": "cd apps/price-poller-service && pnpm dev"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  }
+}

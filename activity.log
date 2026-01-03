@@ -1,0 +1,611 @@
+Module 1 update
+Module 2 update
+Module 3 update
+Module 4 update
+Module 5 update
+Module 6 update
+Module 7 update
+Module 8 update
+Module 9 update
+Module 10 update
+Module 11 update
+Module 12 update
+Module 13 update
+Module 14 update
+Module 15 update
+Module 16 update
+Module 17 update
+Module 18 update
+Module 19 update
+Module 20 update
+Module 21 update
+Module 22 update
+Module 23 update
+Module 24 update
+Module 25 update
+Module 26 update
+Module 27 update
+Module 28 update
+Module 29 update
+Module 30 update
+Module 31 update
+Module 32 update
+Module 33 update
+Module 34 update
+Module 35 update
+Module 36 update
+Module 37 update
+Module 38 update
+Module 39 update
+Module 40 update
+Module 41 update
+Module 42 update
+Module 43 update
+Module 44 update
+Module 45 update
+Module 46 update
+Module 47 update
+Module 48 update
+Module 49 update
+Module 50 update
+Module 1 update
+Module 2 update
+Module 3 update
+Module 4 update
+Module 5 update
+Module 6 update
+Module 7 update
+Module 8 update
+Module 9 update
+Module 10 update
+Module 11 update
+Module 12 update
+Module 13 update
+Module 14 update
+Module 15 update
+Module 16 update
+Module 17 update
+Module 18 update
+Module 19 update
+Module 20 update
+Module 21 update
+Module 22 update
+Module 23 update
+Module 24 update
+Module 25 update
+Module 26 update
+Module 27 update
+Module 28 update
+Module 29 update
+Module 30 update
+Module 31 update
+Module 32 update
+Module 33 update
+Module 34 update
+Module 35 update
+Module 36 update
+Module 37 update
+Module 38 update
+Module 39 update
+Module 40 update
+Module 41 update
+Module 42 update
+Module 43 update
+Module 44 update
+Module 45 update
+Module 46 update
+Module 47 update
+Module 48 update
+Module 49 update
+Module 50 update
+refactor(order.service): update createOrder function by setting default leverage and adding status field
+fix(useBalance): improve deposit success message formatting
+docs: update documentation on request-response architecture
+refactor(docker): update Dockerfiles, streamline package copying
+refactor(docker): update Dockerfiles for all services to use TypeScript compiler instead of pnpm build
+chore(docker): remove JWT_SECRET and DATABASE_URL
+feat(docker): add api-service, engine-service, and price-poller-service to docker-compose
+refactor(docker): update Dockerfiles for api-service and engine-service to use Prisma package
+feat(engine-service): update order processing and balance management with utility functions and improved error handling
+fix(redisSubscriber): improve error handling and callback resolution in message processing loop
+feat(validation): integrate Zod validation schemas for login, registration, balance, and order management in controllers
+feat(schemas): add validation schemas for authentication, balance, candles, and trade using Zod
+chore(dependencies): add zod package
+refactor(price-poller-service): comment out console log
+chore(docker): remove Postgres service
+refactor(engine-service): update Prisma client import to use package
+chore(dependencies): add Prisma package to devDependencies and remove Prisma client from dependencies
+refactor(prisma): update import paths for Prisma client in controllers and middleware
+chore(prisma): migrate Prisma schema and migrations to new package structure
+refactor(dependencies): remove Prisma client dependency
+feat(layout): update metadata for SEO with Open Graph and Twitter card integration, and add OG image
+feat(axios): add "/auth/me" to public 401 safe paths and prevent retry on home page
+fix(Header): remove hover effect from logout button styles
+feat(RightSideBar): integrate balance retrieval and margin check for order execution
+feat(engine-service): implement balance update in database during order processing
+refactor(api-service): clean up CORS origins and remove unused preflight handling
+refactor(api-service): simplify CORS configuration and enhance preflight handling
+feat(api-service): add additional CORS origins for 100xness
+feat(axios): update API_URL to production endpoint
+feat(Header): implement mobile menu
+refactor(order.service): update createOrder function by setting default leverage and adding status field
+fix(useBalance): improve deposit success message formatting
+docs: update documentation on request-response architecture
+refactor(docker): update Dockerfiles, streamline package copying
+refactor(docker): update Dockerfiles for all services to use TypeScript compiler instead of pnpm build
+chore(docker): remove JWT_SECRET and DATABASE_URL
+feat(docker): add api-service, engine-service, and price-poller-service to docker-compose
+refactor(docker): update Dockerfiles for api-service and engine-service to use Prisma package
+feat(engine-service): update order processing and balance management with utility functions and improved error handling
+fix(redisSubscriber): improve error handling and callback resolution in message processing loop
+feat(validation): integrate Zod validation schemas for login, registration, balance, and order management in controllers
+feat(schemas): add validation schemas for authentication, balance, candles, and trade using Zod
+chore(dependencies): add zod package
+refactor(price-poller-service): comment out console log
+chore(docker): remove Postgres service
+refactor(engine-service): update Prisma client import to use package
+chore(dependencies): add Prisma package to devDependencies and remove Prisma client from dependencies
+refactor(prisma): update import paths for Prisma client in controllers and middleware
+chore(prisma): migrate Prisma schema and migrations to new package structure
+refactor(dependencies): remove Prisma client dependency
+feat(layout): update metadata for SEO with Open Graph and Twitter card integration, and add OG image
+feat(axios): add "/auth/me" to public 401 safe paths and prevent retry on home page
+fix(Header): remove hover effect from logout button styles
+feat(RightSideBar): integrate balance retrieval and margin check for order execution
+feat(engine-service): implement balance update in database during order processing
+refactor(api-service): clean up CORS origins and remove unused preflight handling
+refactor(api-service): simplify CORS configuration and enhance preflight handling
+feat(api-service): add additional CORS origins for 100xness
+feat(axios): update API_URL to production endpoint
+feat(Header): implement mobile menu
+refactor(order.service): update createOrder function
+fix(useBalance): improve deposit success message
+docs: update documentation on architecture
+refactor(docker): streamline package copying
+refactor(docker): use TS compiler
+chore(docker): remove secrets
+feat(docker): add services to compose
+refactor(docker): use Prisma
+feat(engine-service): update balance management
+fix(redis): improve error handling
+feat(validation): integrate Zod
+feat(schemas): add auth schemas
+chore(dependencies): add zod
+refactor(price-poller): cleanup logs
+chore(docker): remove Postgres
+refactor(engine-service): fix Prisma import
+chore(dependencies): add Prisma
+refactor(prisma): update paths
+chore(prisma): migrate schema
+refactor(dependencies): remove client
+feat(layout): add SEO metadata
+feat(axios): fix auth paths
+fix(Header): remove hover effect
+feat(RightSideBar): add margin check
+feat(engine-service): db update
+refactor(api-service): clean CORS
+feat(api-service): add prod origins
+feat(axios): update API_URL
+feat(Header): add mobile menu
+perf: optimize memoization
+fix: build pipeline
+chore: bump versions
+feat: add logging
+refactor: clean up interfaces
+test: add unit tests
+fix: race condition in order
+feat: add rate limiting
+docs: update API spec
+chore: cleanup unused files
+perf: cache database queries
+feat: add user profile
+fix: logout session
+refactor: extract logic to hooks
+feat: add dark mode
+fix: responsive layout
+chore: minor optimization and cleanup 22625
+chore: minor optimization and cleanup 1118
+chore: minor optimization and cleanup 19907
+chore: minor optimization and cleanup 30309
+chore: minor optimization and cleanup 2597
+chore: minor optimization and cleanup 10398
+chore: minor optimization and cleanup 16193
+chore: minor optimization and cleanup 23118
+chore: minor optimization and cleanup 22515
+chore: minor optimization and cleanup 8606
+chore: minor optimization and cleanup 15097
+chore: minor optimization and cleanup 12807
+chore: minor optimization and cleanup 6165
+chore: minor optimization and cleanup 16519
+chore: minor optimization and cleanup 26289
+chore: minor optimization and cleanup 4202
+chore: minor optimization and cleanup 19808
+chore: minor optimization and cleanup 25033
+chore: minor optimization and cleanup 25197
+chore: minor optimization and cleanup 25969
+chore: minor optimization and cleanup 27194
+chore: minor optimization and cleanup 2554
+chore: minor optimization and cleanup 5646
+chore: minor optimization and cleanup 10623
+chore: minor optimization and cleanup 24030
+chore: minor optimization and cleanup 23269
+chore: minor optimization and cleanup 3907
+chore: minor optimization and cleanup 4016
+chore: minor optimization and cleanup 28232
+chore: minor optimization and cleanup 22116
+chore: minor optimization and cleanup 16729
+chore: minor optimization and cleanup 24081
+chore: minor optimization and cleanup 13989
+chore: minor optimization and cleanup 7926
+chore: minor optimization and cleanup 24262
+chore: minor optimization and cleanup 21904
+chore: minor optimization and cleanup 2117
+chore: minor optimization and cleanup 139
+chore: minor optimization and cleanup 12846
+chore: minor optimization and cleanup 28243
+chore: minor optimization and cleanup 5589
+chore: minor optimization and cleanup 2696
+chore: minor optimization and cleanup 9205
+chore: minor optimization and cleanup 20717
+chore: minor optimization and cleanup 10829
+chore: minor optimization and cleanup 14521
+chore: minor optimization and cleanup 9957
+chore: minor optimization and cleanup 16746
+chore: minor optimization and cleanup 19065
+chore: minor optimization and cleanup 28644
+chore: minor optimization and cleanup 8313
+chore: minor optimization and cleanup 10099
+chore: minor optimization and cleanup 9385
+chore: minor optimization and cleanup 24503
+chore: minor optimization and cleanup 9353
+chore: minor optimization and cleanup 24472
+chore: minor optimization and cleanup 6500
+chore: minor optimization and cleanup 31288
+chore: minor optimization and cleanup 7018
+chore: minor optimization and cleanup 2206
+chore: minor optimization and cleanup 22625
+chore: minor optimization and cleanup 22242
+chore: minor optimization and cleanup 17330
+chore: minor optimization and cleanup 30544
+chore: minor optimization and cleanup 14613
+chore: minor optimization and cleanup 20290
+chore: minor optimization and cleanup 10131
+chore: minor optimization and cleanup 25750
+chore: minor optimization and cleanup 28548
+chore: minor optimization and cleanup 27762
+chore: minor optimization and cleanup 17493
+chore: minor optimization and cleanup 20628
+chore: minor optimization and cleanup 21169
+chore: minor optimization and cleanup 507
+chore: minor optimization and cleanup 5220
+chore: minor optimization and cleanup 28282
+chore: minor optimization and cleanup 5122
+chore: minor optimization and cleanup 7851
+chore: minor optimization and cleanup 8385
+chore: minor optimization and cleanup 31298
+chore: minor optimization and cleanup 1921
+chore: minor optimization and cleanup 12443
+chore: minor optimization and cleanup 10408
+chore: minor optimization and cleanup 19878
+chore: minor optimization and cleanup 1823
+chore: minor optimization and cleanup 1342
+chore: minor optimization and cleanup 16347
+chore: minor optimization and cleanup 24005
+chore: minor optimization and cleanup 20737
+chore: minor optimization and cleanup 15470
+chore: minor optimization and cleanup 1808
+chore: minor optimization and cleanup 11421
+chore: minor optimization and cleanup 3654
+chore: minor optimization and cleanup 11504
+chore: minor optimization and cleanup 24792
+chore: minor optimization and cleanup 2580
+chore: minor optimization and cleanup 18818
+chore: minor optimization and cleanup 31063
+chore: minor optimization and cleanup 27628
+chore: minor optimization and cleanup 25642
+chore: minor optimization and cleanup 2105
+chore: minor optimization and cleanup 747
+chore: minor optimization and cleanup 17460
+chore: minor optimization and cleanup 13262
+chore: minor optimization and cleanup 15363
+refactor(order.service): update createOrder function
+fix(useBalance): improve deposit success message
+docs: update documentation on architecture
+refactor(docker): streamline package copying
+refactor(docker): use TS compiler
+chore(docker): remove secrets
+feat(docker): add services to compose
+refactor(docker): use Prisma
+feat(engine-service): update balance management
+fix(redis): improve error handling
+feat(validation): integrate Zod
+feat(schemas): add auth schemas
+chore(dependencies): add zod
+refactor(price-poller): cleanup logs
+chore(docker): remove Postgres
+refactor(engine-service): fix Prisma import
+chore(dependencies): add Prisma
+refactor(prisma): update paths
+chore(prisma): migrate schema
+refactor(dependencies): remove client
+feat(layout): add SEO metadata
+feat(axios): fix auth paths
+fix(Header): remove hover effect
+feat(RightSideBar): add margin check
+feat(engine-service): db update
+refactor(api-service): clean CORS
+feat(api-service): add prod origins
+feat(axios): update API_URL
+feat(Header): add mobile menu
+perf: optimize memoization
+fix: build pipeline
+chore: bump versions
+feat: add logging
+refactor: clean up interfaces
+test: add unit tests
+fix: race condition in order
+feat: add rate limiting
+docs: update API spec
+chore: cleanup unused files
+perf: cache database queries
+feat: add user profile
+fix: logout session
+refactor: extract logic to hooks
+feat: add dark mode
+fix: responsive layout
+chore: minor optimization and cleanup 17293
+chore: minor optimization and cleanup 7137
+chore: minor optimization and cleanup 4210
+chore: minor optimization and cleanup 24617
+chore: minor optimization and cleanup 17525
+chore: minor optimization and cleanup 7421
+chore: minor optimization and cleanup 23930
+chore: minor optimization and cleanup 13748
+chore: minor optimization and cleanup 23822
+chore: minor optimization and cleanup 18810
+chore: minor optimization and cleanup 2587
+chore: minor optimization and cleanup 7104
+chore: minor optimization and cleanup 74
+chore: minor optimization and cleanup 5275
+chore: minor optimization and cleanup 26530
+chore: minor optimization and cleanup 17247
+chore: minor optimization and cleanup 18658
+chore: minor optimization and cleanup 30933
+chore: minor optimization and cleanup 8635
+chore: minor optimization and cleanup 7978
+chore: minor optimization and cleanup 3115
+chore: minor optimization and cleanup 32418
+chore: minor optimization and cleanup 24925
+chore: minor optimization and cleanup 11083
+chore: minor optimization and cleanup 25519
+chore: minor optimization and cleanup 10169
+chore: minor optimization and cleanup 30044
+chore: minor optimization and cleanup 10251
+chore: minor optimization and cleanup 6140
+chore: minor optimization and cleanup 16726
+chore: minor optimization and cleanup 32071
+chore: minor optimization and cleanup 30333
+chore: minor optimization and cleanup 15560
+chore: minor optimization and cleanup 5067
+chore: minor optimization and cleanup 3067
+chore: minor optimization and cleanup 8215
+chore: minor optimization and cleanup 24802
+chore: minor optimization and cleanup 9697
+chore: minor optimization and cleanup 29491
+chore: minor optimization and cleanup 9864
+chore: minor optimization and cleanup 26808
+chore: minor optimization and cleanup 15729
+chore: minor optimization and cleanup 32118
+chore: minor optimization and cleanup 25026
+chore: minor optimization and cleanup 9627
+chore: minor optimization and cleanup 30700
+chore: minor optimization and cleanup 21072
+chore: minor optimization and cleanup 6593
+chore: minor optimization and cleanup 102
+chore: minor optimization and cleanup 21552
+chore: minor optimization and cleanup 15249
+chore: minor optimization and cleanup 23954
+chore: minor optimization and cleanup 14970
+chore: minor optimization and cleanup 16426
+chore: minor optimization and cleanup 1658
+chore: minor optimization and cleanup 23062
+chore: minor optimization and cleanup 4487
+chore: minor optimization and cleanup 21171
+chore: minor optimization and cleanup 26333
+chore: minor optimization and cleanup 30649
+chore: minor optimization and cleanup 19932
+chore: minor optimization and cleanup 14259
+chore: minor optimization and cleanup 20637
+chore: minor optimization and cleanup 32069
+chore: minor optimization and cleanup 22193
+chore: minor optimization and cleanup 15979
+chore: minor optimization and cleanup 9269
+chore: minor optimization and cleanup 14257
+chore: minor optimization and cleanup 31141
+chore: minor optimization and cleanup 30153
+chore: minor optimization and cleanup 2230
+chore: minor optimization and cleanup 4994
+chore: minor optimization and cleanup 22723
+chore: minor optimization and cleanup 4922
+chore: minor optimization and cleanup 29922
+chore: minor optimization and cleanup 10368
+chore: minor optimization and cleanup 32390
+chore: minor optimization and cleanup 19422
+chore: minor optimization and cleanup 3641
+chore: minor optimization and cleanup 18878
+chore: minor optimization and cleanup 4899
+chore: minor optimization and cleanup 1387
+chore: minor optimization and cleanup 28738
+chore: minor optimization and cleanup 8505
+chore: minor optimization and cleanup 9528
+chore: minor optimization and cleanup 9214
+chore: minor optimization and cleanup 2295
+chore: minor optimization and cleanup 10945
+chore: minor optimization and cleanup 2772
+chore: minor optimization and cleanup 4811
+chore: minor optimization and cleanup 1653
+chore: minor optimization and cleanup 7478
+chore: minor optimization and cleanup 20642
+chore: minor optimization and cleanup 19431
+chore: minor optimization and cleanup 14041
+chore: minor optimization and cleanup 4387
+chore: minor optimization and cleanup 10299
+chore: minor optimization and cleanup 15411
+chore: minor optimization and cleanup 28115
+chore: minor optimization and cleanup 21521
+chore: minor optimization and cleanup 11771
+chore: minor optimization and cleanup 21119
+chore: minor optimization and cleanup 18800
+chore: minor optimization and cleanup 26237
+chore: minor optimization and cleanup 7820
+refactor(order.service): update createOrder function
+fix(useBalance): improve deposit success message
+docs: update documentation on architecture
+refactor(docker): streamline package copying
+refactor(docker): use TS compiler
+chore(docker): remove secrets
+feat(docker): add services to compose
+refactor(docker): use Prisma
+feat(engine-service): update balance management
+fix(redis): improve error handling
+feat(validation): integrate Zod
+feat(schemas): add auth schemas
+chore(dependencies): add zod
+refactor(price-poller): cleanup logs
+chore(docker): remove Postgres
+refactor(engine-service): fix Prisma import
+chore(dependencies): add Prisma
+refactor(prisma): update paths
+chore(prisma): migrate schema
+refactor(dependencies): remove client
+feat(layout): add SEO metadata
+feat(axios): fix auth paths
+fix(Header): remove hover effect
+feat(RightSideBar): add margin check
+feat(engine-service): db update
+refactor(api-service): clean CORS
+feat(api-service): add prod origins
+feat(axios): update API_URL
+feat(Header): add mobile menu
+perf: optimize memoization
+fix: build pipeline
+chore: bump versions
+feat: add logging
+refactor: clean up interfaces
+test: add unit tests
+fix: race condition in order
+feat: add rate limiting
+docs: update API spec
+chore: cleanup unused files
+perf: cache database queries
+feat: add user profile
+fix: logout session
+refactor: extract logic to hooks
+feat: add dark mode
+fix: responsive layout
+chore: minor optimization and cleanup 3480
+chore: minor optimization and cleanup 5238
+chore: minor optimization and cleanup 20744
+chore: minor optimization and cleanup 6307
+chore: minor optimization and cleanup 12592
+chore: minor optimization and cleanup 30046
+chore: minor optimization and cleanup 28601
+chore: minor optimization and cleanup 23466
+chore: minor optimization and cleanup 2334
+chore: minor optimization and cleanup 12966
+chore: minor optimization and cleanup 13813
+chore: minor optimization and cleanup 152
+chore: minor optimization and cleanup 6453
+chore: minor optimization and cleanup 28314
+chore: minor optimization and cleanup 29771
+chore: minor optimization and cleanup 1101
+chore: minor optimization and cleanup 28494
+chore: minor optimization and cleanup 4634
+chore: minor optimization and cleanup 28559
+chore: minor optimization and cleanup 14832
+chore: minor optimization and cleanup 21627
+chore: minor optimization and cleanup 950
+chore: minor optimization and cleanup 16455
+chore: minor optimization and cleanup 3244
+chore: minor optimization and cleanup 10706
+chore: minor optimization and cleanup 6723
+chore: minor optimization and cleanup 10574
+chore: minor optimization and cleanup 19356
+chore: minor optimization and cleanup 30688
+chore: minor optimization and cleanup 6441
+chore: minor optimization and cleanup 31852
+chore: minor optimization and cleanup 6910
+chore: minor optimization and cleanup 19307
+chore: minor optimization and cleanup 31207
+chore: minor optimization and cleanup 15001
+chore: minor optimization and cleanup 10616
+chore: minor optimization and cleanup 3326
+chore: minor optimization and cleanup 2404
+chore: minor optimization and cleanup 14649
+chore: minor optimization and cleanup 22748
+chore: minor optimization and cleanup 3080
+chore: minor optimization and cleanup 25843
+chore: minor optimization and cleanup 8788
+chore: minor optimization and cleanup 27773
+chore: minor optimization and cleanup 6966
+chore: minor optimization and cleanup 8676
+chore: minor optimization and cleanup 2207
+chore: minor optimization and cleanup 13872
+chore: minor optimization and cleanup 8909
+chore: minor optimization and cleanup 22218
+chore: minor optimization and cleanup 10041
+chore: minor optimization and cleanup 12071
+chore: minor optimization and cleanup 20129
+chore: minor optimization and cleanup 23206
+chore: minor optimization and cleanup 23413
+chore: minor optimization and cleanup 7358
+chore: minor optimization and cleanup 9636
+chore: minor optimization and cleanup 26833
+chore: minor optimization and cleanup 11038
+chore: minor optimization and cleanup 24049
+chore: minor optimization and cleanup 14798
+chore: minor optimization and cleanup 15309
+chore: minor optimization and cleanup 18949
+chore: minor optimization and cleanup 19598
+chore: minor optimization and cleanup 3960
+chore: minor optimization and cleanup 14669
+chore: minor optimization and cleanup 8611
+chore: minor optimization and cleanup 22863
+chore: minor optimization and cleanup 27421
+chore: minor optimization and cleanup 28095
+chore: minor optimization and cleanup 15444
+chore: minor optimization and cleanup 21684
+chore: minor optimization and cleanup 7618
+chore: minor optimization and cleanup 12030
+chore: minor optimization and cleanup 21822
+chore: minor optimization and cleanup 1986
+chore: minor optimization and cleanup 2063
+chore: minor optimization and cleanup 7494
+chore: minor optimization and cleanup 28166
+chore: minor optimization and cleanup 32676
+chore: minor optimization and cleanup 2311
+chore: minor optimization and cleanup 22036
+chore: minor optimization and cleanup 30028
+chore: minor optimization and cleanup 24500
+chore: minor optimization and cleanup 16224
+chore: minor optimization and cleanup 18253
+chore: minor optimization and cleanup 6280
+chore: minor optimization and cleanup 17256
+chore: minor optimization and cleanup 32088
+chore: minor optimization and cleanup 20340
+chore: minor optimization and cleanup 29661
+chore: minor optimization and cleanup 20406
+chore: minor optimization and cleanup 23624
+chore: minor optimization and cleanup 12757
+chore: minor optimization and cleanup 21667
+chore: minor optimization and cleanup 15997
+chore: minor optimization and cleanup 5554
+chore: minor optimization and cleanup 5687
+chore: minor optimization and cleanup 4849
+chore: minor optimization and cleanup 7212
+chore: minor optimization and cleanup 13572
+chore: minor optimization and cleanup 20170
+chore: minor optimization and cleanup 20710
+chore: minor optimization and cleanup 12640
+chore: minor optimization and cleanup 10494
+refactor(order.service): update createOrder function by setting default leverage and adding status field
