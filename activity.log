@@ -609,3 +609,4 @@ chore: minor optimization and cleanup 20710
 chore: minor optimization and cleanup 12640
 chore: minor optimization and cleanup 10494
 refactor(order.service): update createOrder function by setting default leverage and adding status field
+fix(useBalance): improve deposit success message formatting
