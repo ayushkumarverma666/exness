@@ -639,3 +639,4 @@ feat(api-service): add additional CORS origins for 100xness
 feat(axios): update API_URL to production endpoint
 feat(Header): implement mobile menu
 refactor(order.service): update createOrder function by setting default leverage and adding status field
+fix(useBalance): improve deposit success message formatting
