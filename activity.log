@@ -642,3 +642,4 @@ refactor(order.service): update createOrder function by setting default leverage
 fix(useBalance): improve deposit success message formatting
 docs: update documentation on request-response architecture
 refactor(docker): update Dockerfiles, streamline package copying
+refactor(docker): update Dockerfiles for all services to use TypeScript compiler instead of pnpm build
