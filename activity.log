@@ -614,3 +614,4 @@ docs: update documentation on request-response architecture
 refactor(docker): update Dockerfiles, streamline package copying
 refactor(docker): update Dockerfiles for all services to use TypeScript compiler instead of pnpm build
 chore(docker): remove JWT_SECRET and DATABASE_URL
+feat(docker): add api-service, engine-service, and price-poller-service to docker-compose
