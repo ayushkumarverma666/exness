@@ -646,3 +646,4 @@ refactor(docker): update Dockerfiles for all services to use TypeScript compiler
 chore(docker): remove JWT_SECRET and DATABASE_URL
 feat(docker): add api-service, engine-service, and price-poller-service to docker-compose
 refactor(docker): update Dockerfiles for api-service and engine-service to use Prisma package
+feat(engine-service): update order processing and balance management with utility functions and improved error handling
