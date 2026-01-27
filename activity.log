@@ -620,3 +620,4 @@ feat(engine-service): update order processing and balance management with utilit
 fix(redisSubscriber): improve error handling and callback resolution in message processing loop
 feat(validation): integrate Zod validation schemas for login, registration, balance, and order management in controllers
 feat(schemas): add validation schemas for authentication, balance, candles, and trade using Zod
+chore(dependencies): add zod package
