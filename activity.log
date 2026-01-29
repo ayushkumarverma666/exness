@@ -621,3 +621,4 @@ fix(redisSubscriber): improve error handling and callback resolution in message 
 feat(validation): integrate Zod validation schemas for login, registration, balance, and order management in controllers
 feat(schemas): add validation schemas for authentication, balance, candles, and trade using Zod
 chore(dependencies): add zod package
+refactor(price-poller-service): comment out console log
