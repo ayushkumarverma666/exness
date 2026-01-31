@@ -652,3 +652,4 @@ feat(validation): integrate Zod validation schemas for login, registration, bala
 feat(schemas): add validation schemas for authentication, balance, candles, and trade using Zod
 chore(dependencies): add zod package
 refactor(price-poller-service): comment out console log
+chore(docker): remove Postgres service
