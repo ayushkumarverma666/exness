@@ -623,3 +623,4 @@ feat(schemas): add validation schemas for authentication, balance, candles, and 
 chore(dependencies): add zod package
 refactor(price-poller-service): comment out console log
 chore(docker): remove Postgres service
+refactor(engine-service): update Prisma client import to use package
