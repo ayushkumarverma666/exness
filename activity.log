@@ -654,3 +654,4 @@ chore(dependencies): add zod package
 refactor(price-poller-service): comment out console log
 chore(docker): remove Postgres service
 refactor(engine-service): update Prisma client import to use package
+chore(dependencies): add Prisma package to devDependencies and remove Prisma client from dependencies
