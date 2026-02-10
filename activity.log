@@ -627,3 +627,4 @@ refactor(engine-service): update Prisma client import to use package
 chore(dependencies): add Prisma package to devDependencies and remove Prisma client from dependencies
 refactor(prisma): update import paths for Prisma client in controllers and middleware
 chore(prisma): migrate Prisma schema and migrations to new package structure
+refactor(dependencies): remove Prisma client dependency
