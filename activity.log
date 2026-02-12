@@ -658,3 +658,4 @@ chore(dependencies): add Prisma package to devDependencies and remove Prisma cli
 refactor(prisma): update import paths for Prisma client in controllers and middleware
 chore(prisma): migrate Prisma schema and migrations to new package structure
 refactor(dependencies): remove Prisma client dependency
+feat(layout): update metadata for SEO with Open Graph and Twitter card integration, and add OG image
