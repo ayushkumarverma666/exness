@@ -660,3 +660,4 @@ chore(prisma): migrate Prisma schema and migrations to new package structure
 refactor(dependencies): remove Prisma client dependency
 feat(layout): update metadata for SEO with Open Graph and Twitter card integration, and add OG image
 feat(axios): add "/auth/me" to public 401 safe paths and prevent retry on home page
+fix(Header): remove hover effect from logout button styles
