@@ -633,3 +633,4 @@ feat(axios): add "/auth/me" to public 401 safe paths and prevent retry on home p
 fix(Header): remove hover effect from logout button styles
 feat(RightSideBar): integrate balance retrieval and margin check for order execution
 feat(engine-service): implement balance update in database during order processing
+refactor(api-service): clean up CORS origins and remove unused preflight handling
