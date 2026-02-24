@@ -664,3 +664,4 @@ fix(Header): remove hover effect from logout button styles
 feat(RightSideBar): integrate balance retrieval and margin check for order execution
 feat(engine-service): implement balance update in database during order processing
 refactor(api-service): clean up CORS origins and remove unused preflight handling
+refactor(api-service): simplify CORS configuration and enhance preflight handling
