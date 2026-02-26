@@ -635,3 +635,4 @@ feat(RightSideBar): integrate balance retrieval and margin check for order execu
 feat(engine-service): implement balance update in database during order processing
 refactor(api-service): clean up CORS origins and remove unused preflight handling
 refactor(api-service): simplify CORS configuration and enhance preflight handling
+feat(api-service): add additional CORS origins for 100xness
