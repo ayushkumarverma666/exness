@@ -24,8 +24,12 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE: ${{ vars.HF_SPACE }}
         run: |
+          # Push a single-commit snapshot: Spaces reject shallow pushes, and the
+          # older history contains binary files that would need Git LFS.
+          git checkout --orphan hf-deploy
           # A Space needs its config as front matter at the top of README.md.
           printf -- '---\ntitle: Velora\nemoji: 📈\ncolorFrom: blue\ncolorTo: indigo\nsdk: docker\napp_port: 7860\npinned: false\n---\n\n' | cat - README.md > README.hf.md
           mv README.hf.md README.md
-          git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -qam "Deploy ${GITHUB_SHA::7}"
+          git add -A
+          git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -qm "Deploy ${GITHUB_SHA::7}"
           git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main
