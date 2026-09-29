@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { prisma } from "@repo/prisma";
+import { config } from "../lib/config";
 
 interface JwtPayload {
   id: string;
@@ -15,45 +15,20 @@ declare global {
   }
 }
 
-export async function authenticate(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+/** Accepts the session cookie or an `Authorization: Bearer` token. */
+export function authenticate(req: Request, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.slice(7) : req.cookies?.token;
+  if (!token) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
   try {
-    const token = req.cookies?.token;
-    if (!token) {
-      res
-        .status(401)
-        .json({ status: "error", message: "Authentication required" });
-      return;
-    }
-
-    const decoded = jwt.verify(token, "secret") as JwtPayload;
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true },
-    });
-
-    if (!user) {
-      res
-        .status(401)
-        .json({ status: "error", message: "User not found or inactive" });
-      return;
-    }
-
-    req.user = { id: user.id, email: user.email };
+    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    req.user = { id: decoded.id, email: decoded.email };
     next();
   } catch (err) {
-    if (err instanceof jwt.TokenExpiredError) {
-      res.status(401).json({ status: "error", message: "Token expired" });
-      return;
-    }
-    if (err instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ status: "error", message: "Invalid token" });
-      return;
-    }
-    next(err);
+    const expired = err instanceof jwt.TokenExpiredError;
+    res.status(401).json({ error: expired ? "Session expired" : "Invalid session" });
   }
 }

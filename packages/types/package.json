@@ -1,7 +1,7 @@
 {
   "name": "@repo/types",
   "version": "1.0.0",
-  "description": "Shared types for exness trading platform",
+  "description": "Shared types and market specs for the trading platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -12,7 +12,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@repo/typescript-config": "workspace:*"
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "5.9.2"
   },
   "dependencies": {}
 }

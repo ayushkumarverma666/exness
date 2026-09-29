@@ -1,122 +1,51 @@
-import { Request, Response } from "express"
-import { redis } from "@repo/redis"
-import { prisma } from "@repo/prisma"
-import { DepositBalanceBodySchema, GetBalanceByAssetParamsSchema } from "../schemas/balance.type";
+import { Request, Response } from "express";
+import { prisma } from "@repo/prisma";
+import { DepositBalanceBodySchema } from "../schemas/balance.type";
+import { engine } from "../lib/engineClient";
+import { engineStatusCode, num, validationError } from "../lib/http";
 
 export const getBalance = async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-        return res.json("user not found");
-    }
-
-    const balances = await prisma.asset.findMany({
-        where: {
-            userId: userId
-        },
-        select: {
-            symbol: true,
-            balance: true,
-            decimals: true
-        }
-    });
-
-    res.json({ userId, balances });
-}
-
-export const getBalanceByAsset = async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-        return res.json("user not found");
-    }
-
-    const result = GetBalanceByAssetParamsSchema.safeParse(req.params);
-    if (!result.success) {
-        return res.status(400).json({ error: result.error.message });
-    }
-
-    const { symbol } = result.data;
-
-    if (!symbol) return res.json("asset required");
-    const record = await prisma.asset.findUnique({
-        where: {
-            user_symbol_unique: {
-                userId, 
-                symbol: symbol as any
-            }
-        },
-        select: {
-            symbol: true,
-            balance: true,
-            decimals: true
-        }
-    });
-
-    if (!record) return res.json("asset not found");
-
-    res.json(record);
-}
+  const userId = req.user!.id;
+  const [assets, locked] = await Promise.all([
+    prisma.asset.findMany({ where: { userId }, select: { symbol: true, balance: true } }),
+    prisma.order.aggregate({ where: { userId, status: "open" }, _sum: { margin: true } }),
+  ]);
+  const usdc = assets.find((a) => a.symbol === "USDC");
+  res.json({
+    currency: "USDC",
+    // Free balance: cash not currently locked as margin in open positions.
+    balance: usdc ? Number(usdc.balance) : 0,
+    usedMargin: num(locked._sum.margin) ?? 0,
+    balances: assets.map((a) => ({ symbol: a.symbol, balance: Number(a.balance) })),
+  });
+};
 
 export const depositBalance = async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-        return res.json("user not found");
-    }
+  const result = DepositBalanceBodySchema.safeParse(req.body);
+  if (!result.success) return validationError(res, result.error);
 
-    const result = DepositBalanceBodySchema.safeParse(req.body);
-    if (!result.success) {
-        return res.status(400).json({ error: result.error.message });
-    }
+  const reply = await engine.send("deposit", { userId: req.user!.id, amount: result.data.amount });
+  if (reply.status !== "deposited") {
+    return res.status(engineStatusCode[reply.status]).json({ error: reply.message || reply.status });
+  }
+  res.json({ message: "Deposit complete", balance: reply.data?.balance });
+};
 
-    const { symbol, amount, decimals } = result.data;
-
-    const validSymbols = ['USDC', 'BTC'];
-    if (!validSymbols.includes(symbol)) {
-        return res.status(400).json({ 
-            error: "Invalid symbol", 
-            validSymbols: validSymbols 
-        });
-    }
-
-
-    const decimalPlaces = decimals ?? (symbol === 'USDC' ? 2 : 8);
-    const baseUnitAmount = Math.round(amount * Math.pow(10, decimalPlaces));
-
-    const updated = await prisma.asset.upsert({
-        where: {
-            user_symbol_unique: {
-                userId, symbol
-            }
-        },
-        create: {
-            userId,
-            symbol,
-            balance: baseUnitAmount,
-            decimals: decimalPlaces
-        },
-        update: {
-            balance: { increment: baseUnitAmount },
-        },
-        select: {
-            symbol: true,
-            balance: true,
-            decimals: true
-        }
-    });
-
-    await redis.xadd(
-        "engine-stream",
-        "*",
-        "data",
-        JSON.stringify({
-            kind: "balance-update",
-            payload: {
-                userId,
-                symbol,
-                newBalance: updated.balance,
-                decimals: updated.decimals
-            }
-        })
-    );
-
-    res.json(updated);
-}
+export const getTransactions = async (req: Request, res: Response) => {
+  const rows = await prisma.transaction.findMany({
+    where: { userId: req.user!.id },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+  res.json({
+    transactions: rows.map((t) => ({
+      id: t.id,
+      type: t.type,
+      symbol: t.symbol,
+      amount: Number(t.amount),
+      balanceAfter: Number(t.balanceAfter),
+      orderId: t.orderId,
+      createdAt: t.createdAt.toISOString(),
+    })),
+  });
+};

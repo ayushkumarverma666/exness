@@ -1,227 +1,149 @@
-# exness
+# Velora — crypto margin trading platform
 
-A real-time options trading platform like [Exness](https://www.exness.com/) built with Node.js, Express, PostgreSQL, and Next.js frontend.
+A full-stack margin-trading platform for **BTC, ETH and SOL** against USDC:
 
-## Monorepo Structure
+- **Live pricing:** bid/ask streamed from Backpack Exchange's public order book.
+- **Matching engine:** market orders, isolated margin, 1–100× leverage, and server-side take-profit, stop-loss and liquidation.
+- **Web terminal:** live chart with position lines, order book, recent trades, and an order ticket with a pre-trade risk preview.
 
-This project uses [Turborepo](https://turbo.build/) for monorepo management and includes:
-
-- **API Service** (`apps/api-service/`) - Express API server for authentication, trading, and balance management (Port 3001)
-- **Engine Service** (`apps/engine-service/`) - Trading engine for order processing and price monitoring (Port 3002)
-- **Price Poller Service** (`apps/price-poller-service/`) - WebSocket connection to Backpack Exchange for real-time prices (Port 3003)
-- **Web** (`apps/web/`) - Next.js frontend application
-- **Shared Packages** (`packages/`) - Shared utilities, UI components, types, and configurations
-
-## Overview
-
-### 1. **API Service** (`apps/api-service/`)
-
-- HTTP API server for user authentication (JWT), order management, balance operations, and candle data
-- Communicates with the Trading Engine via Redis streams
-- Built with Express.js and TypeScript
-- Runs on **Port 3001**
-
-### 2. **Engine Service** (`apps/engine-service/`)
-
-- Core trading engine that processes orders, manages positions, handles liquidations
-- Monitors open positions for take-profit and stop-loss triggers
-- Manages user balances in real-time and saves order data to the database
-- Built with Node.js and Redis streams
-- Runs on **Port 3002**
-
-### 3. **Price Poller Service** (`apps/price-poller-service/`)
-
-- Maintains WebSocket connection to Backpack Exchange for real-time BTC_USDC prices
-- Sends price updates to the trading engine via Redis streams
-- Built with Node.js and WebSocket
-- Runs on **Port 3003**
+Accounts are **demo accounts**. Every new user gets 10,000 virtual USDC, and no real money is involved.
+The platform name and copy live in `apps/web/app/lib/brand.ts`.
 
 ## Architecture
-<img width="1345" height="742" alt="image" src="https://github.com/user-attachments/assets/36d47a4d-3350-489f-9628-7a1f5a1b5878" />
-
-
-## Database Structure
-
-The system uses PostgreSQL with Prisma ORM.
-
-### Users
 
 ```
-id
-email
-password
-name
+                 ┌────────────── one container / one port (7860) ──────────────┐
+ Browser ──HTTP──▶ Next.js web ──/api/*──▶ API service ──┐                      │
+    │            │                                        │ Redis Streams        │
+    │            │   Price feed ──bookTicker quotes──▶ engine-stream ──▶ Engine │
+    │            │   (Backpack WS)                        ◀── callback-queue ──┘ │
+    │            └───────────────────────────────────────────┬──────────────────┘
+    └──WebSocket (live ticks for the UI)──▶ Backpack          │
+                                                          PostgreSQL (Neon)
 ```
 
-### Assets
+| Service | Path | Role |
+|---|---|---|
+| Web | `apps/web` | Next.js 15 terminal and marketing site. Proxies `/api/*` to the API so everything is served from one origin. |
+| API | `apps/api-service` | Express: auth (bcrypt and JWT, via cookie or bearer token), orders, balances, ledger, and cached market data (tickers, depth, trades, candles). |
+| Engine | `apps/engine-service` | Single writer of balances and positions. Processes requests sequentially from a Redis stream and checks TP/SL/liquidation on every tick. Restores open positions and balances from Postgres on start. |
+| Price feed | `apps/price-poller-service` | Subscribes to `bookTicker` for every market, reconnects with backoff and publishes quotes to the engine. |
+| Shared | `packages/*` | Prisma schema and migrations, Redis helpers, and market specs and types shared by the engine and API. |
 
-```
-symbol
-balance
-decimals
-userId
-```
+### Trading rules
 
-### Orders
+- Longs fill at the **ask**, shorts at the **bid**. Positions are valued at the price they can be closed at.
+- Required margin = size × price ÷ leverage. Each position's margin is **isolated**, so a trade can never lose more than its margin.
+- A position is liquidated when its remaining margin falls to 5% of the initial margin: liquidation price = entry × (1 ∓ 0.95 ÷ leverage).
+- If a price is more than 30 seconds old, the engine rejects new orders.
+- P&L is always computed by the engine; the client never supplies it.
 
-```
-id
-userId
-side
-qty
-openingPrice
-closingPrice
-status
-leverage
-takeProfit
-stopLoss
-pnl
-closeReason
-```
+## Local development
 
-## Setup Project
-
-### Prerequisites
-
-- Node.js
-- Docker
-- PostgreSQL database (using docker)
-- Redis server (using docker)
-- pnpm package manager
-
-### Installation
-
-1. **Install dependencies:**
-
-   ```bash
-   pnpm install
-   ```
-
-2. **Set up environment variables:**
-   Create a `.env` file in the backend directory:
-
-   ```env
-   DATABASE_URL="postgresql://username:password@localhost:5432/trading_db"
-   REDIS_URL="redis://localhost:6379"
-   PORT=3001
-   ```
-
-3. **Start Docker:**
-
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Set up the database:**
-   ```bash
-   npx prisma migrate dev
-   npx prisma generate
-   ```
-
-### Running the Application
-
-#### Using Turbo (Recommended)
-
-**Start all services:**
+Requirements: Node 22+, pnpm 9, Postgres and Redis (or Docker).
 
 ```bash
-pnpm run dev
+pnpm install
+cp .env.example apps/api-service/.env      # repeat for engine-service and price-poller-service
+pnpm db:migrate
+pnpm build
+
+# in separate terminals
+pnpm dev:engine
+pnpm dev:price-poller                       # PRICE_FEED=simulated if the exchange is unreachable
+pnpm dev:api
+pnpm dev:web                                # http://localhost:3200
 ```
 
-**Start specific services:**
+Or run the production image locally, with Postgres included: `docker compose up --build`, then open http://localhost:7860.
 
-```bash
-pnpm run build
-pnpm run lint
-pnpm run check-types
-```
+## Deploy for free
 
-#### Manual Service Management
+The whole platform (web, API, engine, price feed and Redis) runs in **one Docker container** built by the root
+`Dockerfile`. The only external dependency is Postgres.
 
-The backend consists of three separate microservices that need to be running:
+### 1. Database: Neon (free)
 
-1. **Start the API Service (Port 3001):**
+1. Sign up at [neon.tech](https://neon.tech) and create a project.
+2. Copy the connection string, e.g. `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`.
 
-   ```bash
-   pnpm run dev:api
-   ```
+Migrations run automatically every time the container starts.
 
-2. **Start the Engine Service (Port 3002):**
+### 2. App: Hugging Face Spaces (free CPU: 2 vCPU, 16 GB RAM)
 
-   ```bash
-   pnpm run dev:engine
-   ```
+1. Go to [huggingface.co/new-space](https://huggingface.co/new-space) and choose **Docker**, then **Blank**, on the free **CPU basic** hardware.
+2. In the Space's **Settings → Variables and secrets**, add these **secrets**:
 
-3. **Start the Price Poller Service (Port 3003):**
-   ```bash
-   pnpm run dev:price-poller
-   ```
+   | Name | Value |
+   |---|---|
+   | `DATABASE_URL` | your Neon connection string |
+   | `JWT_SECRET` | a random string of 32+ characters (`openssl rand -hex 32`) |
+   | `SITE_URL` | optional: `https://<user>-<space>.hf.space` |
 
-**Note**: All three services must be running for the platform to work properly.
+3. Push the code to the Space. You can either:
+   - **Automatic (recommended):** in this GitHub repo, add the secret `HF_TOKEN` (a Hugging Face *write* token) and the
+     variable `HF_SPACE` (`your-name/your-space`). Every push to `main` then deploys through
+     `.github/workflows/deploy-huggingface.yml`.
+   - **Manual:** add the Space as a git remote and push. The Space's README must start with the front matter below,
+     which the workflow adds for you:
 
-#### Production Service
+     ```yaml
+     ---
+     title: Velora
+     sdk: docker
+     app_port: 7860
+     ---
+     ```
 
-For production builds:
+4. The Space builds the image (~5 minutes) and serves the app at `https://<user>-<space>.hf.space`.
 
-1. **Build and start API Service:**
-   ```bash
-   pnpm run start:api
-   ```
+**Good to know**
+- Free Spaces go to sleep after about 48 hours without visitors and wake on the next visit. All state lives in Postgres,
+  and the engine restores open positions when it starts, so nothing is lost. Take-profit, stop-loss and liquidation are
+  not checked while the Space is asleep.
+- The Space's disk is temporary. That's fine here, because Redis only carries in-flight messages.
+- Use the direct `*.hf.space` URL rather than the embedded huggingface.co page. Inside the iframe, the app falls back
+  to bearer tokens because browsers block third-party cookies.
 
-2. **Build and start Engine Service:**
-   ```bash
-   pnpm run start:engine
-   ```
+### Alternative: web on Vercel, API elsewhere
 
-3. **Build and start Price Poller Service:**
-   ```bash
-   pnpm run start:price-poller
-   ```
+The web app also works on Vercel with `NEXT_PUBLIC_API_URL=https://your-api-host`. On the API, set
+`CORS_ORIGINS=https://your-app.vercel.app` and `COOKIE_SAMESITE=none`.
 
-## API Endpoints
+## Environment variables
 
-### Authentication
+| Variable | Service | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | api, engine | — | Postgres connection string |
+| `JWT_SECRET` | api | dev secret | **Required in production** (≥ 32 chars) |
+| `REDIS_URL` / `REDIS_HOST` / `REDIS_PORT` | all | `127.0.0.1:6379` | Redis connection |
+| `PRICE_FEED` | price feed | `backpack` | `simulated` for offline development only |
+| `MARKET_DATA_API` | api | Backpack REST | Upstream for tickers, depth, trades, candles |
+| `CORS_ORIGINS` | api | localhost | Extra allowed origins (comma-separated) |
+| `COOKIE_SAMESITE` / `COOKIE_SECURE` | api | `lax` / on in prod | Session cookie flags |
+| `API_INTERNAL_URL` | web (build) | `http://127.0.0.1:3001` | Where `/api/*` is proxied |
+| `NEXT_PUBLIC_API_URL` | web (build) | `/api` | API base URL when it's on another domain |
+| `SITE_URL` | web | — | Public URL for social preview images |
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/logout`
-- `GET /auth/me`
+## API
 
-### Trading
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/register`, `/auth/login`, `/auth/logout` | — | Session management (sets cookie and returns token) |
+| GET | `/auth/me` | ✓ | Current user |
+| GET | `/balance` | ✓ | Free balance and used margin |
+| POST | `/balance/deposit` | ✓ | Demo top-up (≤ 100k per request, ≤ 1M total) |
+| GET | `/balance/transactions` | ✓ | Account ledger |
+| POST | `/trade/open` | ✓ | `{ asset, side, qty, leverage, takeProfit?, stopLoss? }` |
+| POST | `/trade/close/:orderId` | ✓ | Close at market |
+| GET | `/trade/orders?status=open\|closed` | ✓ | Positions and history |
+| GET | `/trade/stats` | ✓ | Win rate, profit factor, realized P&L |
+| GET | `/market/tickers` | — | Quotes and 24h stats for all markets |
+| GET | `/market/candles?asset=BTC&ts=1h` | — | OHLCV history |
+| GET | `/market/depth/:symbol`, `/market/trades/:symbol` | — | Order book and recent trades |
+| GET | `/health` | — | Database and engine status |
 
-- `POST /trade/create`
-- `POST /trade/close/:orderId`
-- `GET /trade/orders`
-- `GET /trade/orders/:orderId`
+## Risk disclaimer
 
-### Balance
-
-- `GET /balance`
-
-### Candles (Price Data)
-
-- `GET /candles`
-
-### Inter-Service Communication
-
-The services communicate via Redis streams:
-
-- `engine-stream`: Price updates and order requests flow from API Service and Price Poller to Engine Service
-- `callback-queue`: Order confirmations and status updates flow from Engine Service back to API Service
-
-**Service Ports:**
-- API Service: 3001
-- Engine Service: 3002 (internal processing, no HTTP endpoints)
-- Price Poller Service: 3003 (internal processing, no HTTP endpoints)
-
-## Turbo Development
-
-This project uses Turborepo for efficient monorepo development:
-
-### Turbo Commands
-
-- `pnpm run dev` - Start all applications in development mode
-- `pnpm run build` - Build all packages and applications
-- `pnpm run lint` - Lint all packages
-- `pnpm run check-types` - Type check all packages
-- `pnpm run format` - Format code with Prettier
+This software is for education and demonstration. Operating a platform that takes real deposits or offers leveraged
+trading to the public requires financial licences in most countries.

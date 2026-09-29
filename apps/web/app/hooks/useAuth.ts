@@ -1,66 +1,67 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authService } from "../services/auth.service";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
-import { User, LoginRequest, RegisterRequest } from "../types/user.type";
+import { AxiosError } from "axios";
+import { api, apiError, session } from "../lib/api";
+import type { User } from "../lib/types";
 
+type AuthResponse = { user: User; token: string };
 
-export const useAuth = () => {
-    const queryClient = useQueryClient();
-    const router = useRouter();
+export function useAuth() {
+  const queryClient = useQueryClient();
 
-    const { data: user, isLoading } = useQuery<User>({
-        queryKey: ['user'],
-        queryFn: authService.getCurrentUser,
-        retry: false,
-        staleTime: 5 * 60 * 1000,
-    });
-
-    const loginMutation = useMutation({
-        mutationFn: ({ email, password }: LoginRequest) => authService.login(email, password),
-        onSuccess: (data) => {
-            queryClient.setQueryData(['user'], data.user);
-            toast.success('Login successful!');
-        },
-        onError: (error: any) => {
-            const errorMessage = error?.response?.data?.error || 'Login failed';
-            toast.error(errorMessage);
+  const me = useQuery<User | null>({
+    queryKey: ["me"],
+    queryFn: async () => {
+      try {
+        return (await api.get<{ user: User }>("/auth/me")).data.user;
+      } catch (e) {
+        if (e instanceof AxiosError && e.response?.status === 401) {
+          session.set(null);
+          return null;
         }
-    });
+        throw e;
+      }
+    },
+    staleTime: 5 * 60_000,
+  });
 
-    const registerMutation = useMutation({
-        mutationFn: ({ name, email, password }: RegisterRequest) => authService.register(name, email, password),
-        onSuccess: (data) => {
-            queryClient.setQueryData(['user'], data.user);
-            toast.success('Registration successful!');
-            router.push('/');
-        },
-        onError: (error: any) => {
-            const errorMessage = error?.response?.data?.error || 'Registration failed';
-            toast.error(errorMessage);
-        }
-    });
+  const onAuthenticated = (data: AuthResponse) => {
+    session.set(data.token);
+    queryClient.setQueryData(["me"], data.user);
+    queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === "account" });
+  };
 
-    const logoutMutation = useMutation({
-        mutationFn: () => authService.logout(),
-        onSuccess: () => {
-            queryClient.setQueryData(['user'], null);
-            queryClient.invalidateQueries({ queryKey: ['user'] });
-            toast.success('Logout successful');
-        },
-        onError: (error: any) => {
-            const errorMessage = error?.response?.data?.error || 'Logout failed';
-            toast.error(errorMessage);
-        }
-    });
+  const login = useMutation({
+    mutationFn: async (body: { email: string; password: string }) =>
+      (await api.post<AuthResponse>("/auth/login", body)).data,
+    onSuccess: onAuthenticated,
+    onError: (e) => toast.error(apiError(e, "Login failed")),
+  });
 
-    return {
-        loginMutation,
-        registerMutation,
-        logoutMutation,
-        user,
-        isAuthenticated: !!user,
-        isLoading
-    }
+  const register = useMutation({
+    mutationFn: async (body: { name: string; email: string; password: string }) =>
+      (await api.post<AuthResponse>("/auth/register", body)).data,
+    onSuccess: onAuthenticated,
+    onError: (e) => toast.error(apiError(e, "Registration failed")),
+  });
 
+  const logout = useMutation({
+    mutationFn: async () => (await api.post("/auth/logout")).data,
+    onSettled: () => {
+      session.set(null);
+      queryClient.setQueryData(["me"], null);
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] === "account" });
+    },
+  });
+
+  return {
+    user: me.data ?? null,
+    isLoading: me.isLoading,
+    isAuthenticated: !!me.data,
+    login,
+    register,
+    logout,
+  };
 }

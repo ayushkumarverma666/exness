@@ -1,109 +1,56 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { toast } from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "../hooks/useAuth";
+import { AuthShell, Field } from "../components/site/AuthShell";
 
-const LoginPage = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const { loginMutation } = useAuth();
-    const router = useRouter();
+function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const { login } = useAuth();
+  const router = useRouter();
+  const next = useSearchParams().get("next") || "/trade";
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        if (!email || !password) {
-            toast.error('Please fill in all fields');
-            return;
-        }
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    login.mutate({ email, password }, { onSuccess: () => router.push(next) });
+  };
 
-        try {
-            await loginMutation.mutateAsync({ email, password });
-            router.push('/');
-        } catch (error) {
-            console.error('Login error:', error);
-        }
-    };
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Field
+        label="Password"
+        type="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button
+        disabled={login.isPending}
+        className="w-full rounded-md bg-accent py-2.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+      >
+        {login.isPending ? "Signing in…" : "Log in"}
+      </button>
+      <p className="text-center text-sm text-muted">
+        New here?{" "}
+        <Link href={`/register?next=${encodeURIComponent(next)}`} className="text-accent">
+          Open a free account
+        </Link>
+      </p>
+    </form>
+  );
+}
 
-    return (
-        <div className="min-h-screen bg-white flex items-center justify-center px-4">
-
-            <div className="max-w-md w-full mx-auto">
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl md:text-5xl font-medium text-black leading-tight mb-4 font-dm-sans tracking-tighter">
-                        Welcome <span className="italic font-instrument-serif tracking-normal">Back</span>
-                    </h1>
-                    <p className="text-sm md:text-md text-black mb-4 leading-relaxed font-ibm-plex-mono">
-                        Continue your trading journey with exness
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-black mb-2 font-dm-sans">
-                            Email Address
-                        </label>
-                        <input
-                            type="email"
-                            id="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-black rounded-lg focus:outline-none focus:border-gray-600 transition-colors font-dm-sans bg-white"
-                            placeholder="Enter your email"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-black mb-2 font-dm-sans">
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            id="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-black rounded-lg focus:outline-none focus:border-gray-600 transition-colors font-dm-sans bg-white"
-                            placeholder="Enter your password"
-                            required
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={loginMutation.isPending}
-                        className="w-full bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors font-dm-sans font-medium text-lg border-2 border-black cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loginMutation.isPending ? 'Signing In...' : 'Sign In'}
-                    </button>
-                </form>
-
-                <div className="mt-8 text-center">
-                    <p className="text-sm text-black font-dm-sans">
-                        Don&apos;t have an account?{' '}
-                        <Link 
-                            href="/register" 
-                            className="font-medium hover:text-gray-700 transition-colors underline"
-                        >
-                            Create one
-                        </Link>
-                    </p>
-                </div>
-
-                <div className="mt-6 text-center">
-                    <Link 
-                        href="/" 
-                        className="text-sm text-black hover:text-gray-700 transition-colors font-dm-sans underline"
-                    >
-                        ← Back to Home
-                    </Link>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default LoginPage;
+export default function LoginPage() {
+  return (
+    <AuthShell title="Welcome back" subtitle="Log in to your trading account.">
+      <Suspense>
+        <LoginForm />
+      </Suspense>
+    </AuthShell>
+  );
+}

@@ -1,38 +1,27 @@
+# Local production-like stack: Postgres + the all-in-one app image.
+#   docker compose up --build   ->  http://localhost:7860
 services:
-  redis:
-    image: redis:latest
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: trading
     ports:
-      - "6379:6379"
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
-  api-service:
-    build:
-      context: .
-      dockerfile: apps/api-service/Dockerfile
+  app:
+    build: .
     ports:
-      - "3001:3001"
-    env_file:
-      - ./apps/api-service/.env
+      - "7860:7860"
+    environment:
+      DATABASE_URL: postgresql://app:app@postgres:5432/trading
+      JWT_SECRET: local-development-secret-change-me-please-0123456789
+      COOKIE_SECURE: "false"
     depends_on:
-      - redis
+      - postgres
 
-  engine-service:
-    build:
-      context: .
-      dockerfile: apps/engine-service/Dockerfile
-    ports:
-      - "3002:3002"
-    env_file:
-      - ./apps/engine-service/.env
-    depends_on:
-      - redis
-
-  price-poller-service:
-    build:
-      context: .
-      dockerfile: apps/price-poller-service/Dockerfile
-    ports:
-      - "3003:3003"
-    env_file:
-      - ./apps/price-poller-service/.env
-    depends_on:
-      - redis
+volumes:
+  pgdata:

@@ -1,0 +1,31 @@
+# Mirrors this repository to a Hugging Face Docker Space on every push to main.
+# Setup (once): create a Docker Space, then add repository secret HF_TOKEN (a
+# write token) and repository variable HF_SPACE (e.g. "your-name/velora").
+name: Deploy to Hugging Face
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-huggingface
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.HF_SPACE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push to Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          # A Space needs its config as front matter at the top of README.md.
+          printf -- '---\ntitle: Velora\nemoji: 📈\ncolorFrom: blue\ncolorTo: indigo\nsdk: docker\napp_port: 7860\npinned: false\n---\n\n' | cat - README.md > README.hf.md
+          mv README.hf.md README.md
+          git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -qam "Deploy ${GITHUB_SHA::7}"
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main
