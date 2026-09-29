@@ -1,0 +1,34 @@
+# Manually triggered: reports the Hugging Face Space's build stage and health.
+name: Space status
+
+on:
+  workflow_dispatch:
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    if: ${{ vars.HF_SPACE != '' }}
+    steps:
+      - name: Runtime
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          curl -sS -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/$HF_SPACE/runtime" | jq .
+      - name: Health
+        env:
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          host="$(echo "$HF_SPACE" | tr '/_.' '---' | tr 'A-Z' 'a-z').hf.space"
+          curl -sS -m 30 "https://$host/api/health" || true
+      - name: Logs
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          for kind in build run; do
+            echo "===== $kind logs (tail) ====="
+            curl -sS -m 20 -N -H "Authorization: Bearer $HF_TOKEN" \
+              "https://huggingface.co/api/spaces/$HF_SPACE/logs/$kind" | sed -n 's/^data: //p' \
+              | jq -r '.data // empty' 2>/dev/null | tail -n 60 || true
+          done
