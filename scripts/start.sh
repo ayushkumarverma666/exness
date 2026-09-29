@@ -17,13 +17,19 @@ until redis-cli ping >/dev/null 2>&1; do sleep 0.2; done
 echo "[start] database migrations"
 (cd packages/prisma && npx prisma migrate deploy)
 
-echo "[start] engine, price feed, api"
+echo "[start] engine, price feed"
 node apps/engine-service/dist/index.js &
 node apps/price-poller-service/dist/index.js &
-PORT=3001 node apps/api-service/dist/index.js &
 
-echo "[start] web on :$WEB_PORT"
-(cd apps/web && exec npx next start -p "$WEB_PORT" -H 0.0.0.0) &
+if [ "${BACKEND_ONLY:-}" = "1" ]; then
+  # The web app is hosted elsewhere; expose the API on the public port.
+  echo "[start] api on :$WEB_PORT"
+  PORT="$WEB_PORT" node apps/api-service/dist/index.js &
+else
+  echo "[start] api on :3001, web on :$WEB_PORT"
+  PORT=3001 node apps/api-service/dist/index.js &
+  (cd apps/web && exec npx next start -p "$WEB_PORT" -H 0.0.0.0) &
+fi
 
 wait -n
 echo "[start] a service exited; shutting down"

@@ -7,6 +7,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      status_only:
+        description: "Only report the Space's build stage, health and logs"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-huggingface
@@ -15,7 +20,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ vars.HF_SPACE != '' }}
+    if: ${{ vars.HF_SPACE != '' && !inputs.status_only }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,3 +38,26 @@ jobs:
           git add -A
           git -c user.name="deploy-bot" -c user.email="deploy-bot@users.noreply.github.com" commit -qm "Deploy ${GITHUB_SHA::7}"
           git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main
+
+  status:
+    runs-on: ubuntu-latest
+    if: ${{ vars.HF_SPACE != '' && inputs.status_only }}
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE: ${{ vars.HF_SPACE }}
+    steps:
+      - name: Runtime
+        run: |
+          curl -sS -H "Authorization: Bearer $HF_TOKEN" "https://huggingface.co/api/spaces/$HF_SPACE/runtime" | jq .
+      - name: Health
+        run: |
+          host="$(echo "$HF_SPACE" | tr '/_.' '---' | tr 'A-Z' 'a-z').hf.space"
+          curl -sS -m 30 "https://$host/api/health" || true
+      - name: Logs
+        run: |
+          for kind in build run; do
+            echo "===== $kind logs (tail) ====="
+            timeout 25 curl -sS -N -H "Authorization: Bearer $HF_TOKEN" \
+              "https://huggingface.co/api/spaces/$HF_SPACE/logs/$kind" \
+              | sed -n 's/^data: //p' | jq -r '.data // empty' 2>/dev/null | tail -n 60 || true
+          done

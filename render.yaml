@@ -1,0 +1,14 @@
+# Render Blueprint: the backend (API, engine, price feed, Redis) as one free
+# web service. Deploy the web app on Vercel with API_INTERNAL_URL pointing here.
+services:
+  - type: web
+    name: velora-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.backend
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
