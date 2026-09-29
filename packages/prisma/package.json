@@ -16,15 +16,16 @@
     "package.json"
   ],
   "scripts": {
-    "build": "tsc -b",
-    "generate": "prisma generate"
+    "build": "prisma generate && tsc -b",
+    "generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0"
   },
   "devDependencies": {
     "prisma": "^6.15.0",
-    "typescript": "^5.0.0",
+    "typescript": "5.9.2",
     "@repo/typescript-config": "workspace:*"
   }
 }

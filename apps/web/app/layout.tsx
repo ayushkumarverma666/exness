@@ -1,60 +1,27 @@
-import type { Metadata } from "next";
-import { DM_Sans, Instrument_Serif } from "next/font/google";
-import { IBM_Plex_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { BRAND } from "./lib/brand";
 
-const dmSans = DM_Sans({
-  variable: "--font-instrument-sans",
-  subsets: ["latin"],
-  weight: ["400", "700"],
-});
-
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  subsets: ["latin"],
-  weight: ["400"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
-  title: "exness - Trade with confidence",
-  description: "A clean and modern trading experience for active markets.",
-  openGraph: {
-    title: "exness - Trade with confidence",
-    description: "A clean and modern trading experience for active markets.",
-    images: [
-      {
-        url: "/images/OG.png",
-        width: 1200,
-        height: 630,
-        alt: "exness - Trade with confidence",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "exness - Trade with confidence",
-    description: "A clean and modern trading experience for active markets.",
-    images: ["/images/OG.png"],
-  },
+  // Absolute base for social preview images; set SITE_URL to your public URL.
+  metadataBase: process.env.SITE_URL ? new URL(process.env.SITE_URL) : undefined,
+  title: { default: `${BRAND.name} — ${BRAND.tagline}`, template: `%s · ${BRAND.name}` },
+  description: BRAND.description,
+  openGraph: { title: `${BRAND.name} — ${BRAND.tagline}`, description: BRAND.description, type: "website" },
+  twitter: { card: "summary_large_image", title: BRAND.name, description: BRAND.description },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = { themeColor: "#0a0d12" };
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body
-        className={`${dmSans.variable} ${instrumentSerif.variable} ${ibmPlexMono.variable} antialiased`}
-      >
+      <body className={`${inter.variable} ${mono.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

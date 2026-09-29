@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-export const SymbolSchema = z.enum(["USDC", "BTC"]);
-
-export const GetBalanceByAssetParamsSchema = z.object({
-  symbol: SymbolSchema,
-});
-
 export const DepositBalanceBodySchema = z.object({
-  symbol: SymbolSchema,
-  amount: z.coerce.number().positive(),
-  decimals: z.coerce.number().int().min(0).max(8).default(2),
+  amount: z.coerce.number().positive().max(100_000, "Maximum single top-up is 100,000 USDC"),
 });

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -8,22 +9,22 @@ datasource db {
 }
 
 model User {
-  id       String  @id @default(uuid()) @db.Uuid
-  email    String  @unique
-  password String
-  name     String
-  decimal  Int     @default(2)
-  assets   Asset[]
-  orders   Order[]
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique
+  password     String
+  name         String
+  createdAt    DateTime      @default(now())
+  assets       Asset[]
+  orders       Order[]
+  transactions Transaction[]
 }
 
 model Asset {
-  id       String @id @default(uuid()) @db.Uuid
-  symbol   Symbol
-  balance  Int
-  decimals Int
-  userId   String @db.Uuid
-  user     User   @relation(fields: [userId], references: [id])
+  id      String  @id @default(uuid()) @db.Uuid
+  symbol  Symbol
+  balance Decimal @db.Decimal(24, 8)
+  userId  String  @db.Uuid
+  user    User    @relation(fields: [userId], references: [id])
 
   @@unique([userId, symbol], name: "user_symbol_unique")
 }
@@ -31,27 +32,44 @@ model Asset {
 model Order {
   id           String       @id @default(uuid()) @db.Uuid
   userId       String       @db.Uuid
+  asset        Symbol       @default(BTC)
   side         Side
-  pnl          Int
-  decimals     Int          @default(4)
-  openingPrice Int
-  closingPrice Int
-  status       OrderStatus
-  qty          Int
-  qtyDecimals  Int          @default(2)
+  qty          Decimal      @db.Decimal(24, 8)
   leverage     Int          @default(1)
-  takeProfit   Int?
-  stopLoss     Int?
-  margin       Int
+  openingPrice Decimal      @db.Decimal(24, 8)
+  closingPrice Decimal?     @db.Decimal(24, 8)
+  margin       Decimal      @db.Decimal(24, 8)
+  pnl          Decimal      @default(0) @db.Decimal(24, 8)
+  takeProfit   Decimal?     @db.Decimal(24, 8)
+  stopLoss     Decimal?     @db.Decimal(24, 8)
+  status       OrderStatus
   closeReason  CloseReason?
   createdAt    DateTime     @default(now())
   closedAt     DateTime?
   User         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+}
+
+model Transaction {
+  id           String          @id @default(uuid()) @db.Uuid
+  userId       String          @db.Uuid
+  type         TransactionType
+  symbol       Symbol
+  amount       Decimal         @db.Decimal(24, 8)
+  balanceAfter Decimal         @db.Decimal(24, 8)
+  orderId      String?         @db.Uuid
+  createdAt    DateTime        @default(now())
+  user         User            @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
 }
 
 enum Symbol {
   USDC
   BTC
+  ETH
+  SOL
 }
 
 enum Side {
@@ -69,4 +87,9 @@ enum CloseReason {
   StopLoss
   Manual
   Liquidation
+}
+
+enum TransactionType {
+  Deposit
+  RealizedPnl
 }

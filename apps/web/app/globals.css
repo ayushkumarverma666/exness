@@ -1,103 +1,67 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg: #0a0d12;
+  --color-panel: #10141b;
+  --color-panel-2: #161b24;
+  --color-line: #1f2631;
+  --color-line-2: #2a3240;
+  --color-fg: #e8ecf1;
+  --color-muted: #8b95a5;
+  --color-dim: #5c6676;
+  --color-up: #20c77f;
+  --color-down: #f2495c;
+  --color-accent: #5b82ff;
+  --color-warn: #f5a524;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 :root {
-    --font-dm-sans: 'DM Sans', sans-serif;
-    --font-instrument-serif: 'Instrument Serif', serif;
-    --font-ibm-plex-mono: 'IBM Plex Mono', monospace;
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
 }
 
 body {
-    font-family: var(--font-dm-sans);
-    background: #ffffff;
-    color: #111827;
-    line-height: 1.5;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
-a {
-    color: inherit;
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 ::selection {
-    background: #e5e7eb;
-    color: #111827;
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
 
-.font-dm-sans {
-    font-family: var(--font-dm-sans);
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-2) transparent;
 }
 
-.font-instrument-serif {
-    font-family: var(--font-instrument-serif);
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 
-.font-ibm-plex-mono {
-    font-family: var(--font-ibm-plex-mono);
+@keyframes flash-up {
+  from { background-color: color-mix(in srgb, var(--color-up) 22%, transparent); }
+  to { background-color: transparent; }
 }
-
-.resize-handle-horizontal {
-    position: relative;
-    width: 8px;
-    background: #e5e7eb;
-    transition: background-color 0.2s ease;
-    cursor: col-resize;
+@keyframes flash-down {
+  from { background-color: color-mix(in srgb, var(--color-down) 22%, transparent); }
+  to { background-color: transparent; }
 }
-
-.resize-handle-horizontal:hover {
-    background: #d1d5db;
-}
-
-.resize-handle-horizontal:active {
-    background: #9ca3af;
-}
-
-.resize-handle-horizontal::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 3px;
-    height: 20px;
-    background: #6b7280;
-    border-radius: 2px;
-    opacity: 0.6;
-    transition: opacity 0.2s ease;
-}
-
-.resize-handle-horizontal:hover::after {
-    opacity: 1;
-}
-
-.resize-handle-vertical {
-    position: relative;
-    height: 8px;
-    background: #e5e7eb;
-    transition: background-color 0.2s ease;
-    cursor: row-resize;
-}
-
-.resize-handle-vertical:hover {
-    background: #d1d5db;
-}
-
-.resize-handle-vertical:active {
-    background: #9ca3af;
-}
-
-.resize-handle-vertical::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 20px;
-    height: 3px;
-    background: #6b7280;
-    border-radius: 2px;
-    opacity: 0.6;
-    transition: opacity 0.2s ease;
-}
-
-.resize-handle-vertical:hover::after {
-    opacity: 1;
-}
+.flash-up { animation: flash-up 0.8s ease-out; }
+.flash-down { animation: flash-down 0.8s ease-out; }

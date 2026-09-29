@@ -1,533 +1,421 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { redis } from "@repo/redis";
+import { createRedis, addToStream, ENGINE_STREAM, CALLBACK_QUEUE } from "@repo/redis";
 import { prisma } from "@repo/prisma";
+import {
+  MARKETS,
+  MAX_LEVERAGE,
+  MAX_DEMO_BALANCE,
+  PRICE_STALE_MS,
+  liquidationPrice,
+  positionPnl,
+  type AssetSymbol,
+  type CloseReason,
+  type EngineReply,
+  type EngineRequest,
+  type Side,
+} from "@repo/types";
 
-const client = redis.duplicate();
+/**
+ * The engine is the single writer of balances and positions. Every request is
+ * processed sequentially from the Redis stream, so there are no races between
+ * price-triggered closes, manual closes, new orders and deposits.
+ */
 
-type UserBalances = Record<string, number>;
-
-interface Order {
+interface Position {
   id: string;
   userId: string;
-  asset: string;
-  side: "long" | "short";
+  asset: AssetSymbol;
+  side: Side;
   qty: number;
-  leverage?: number;
+  leverage: number;
   openingPrice: number;
-  createdAt: number;
-  status: string;
+  margin: number;
+  liquidationPrice: number;
   takeProfit?: number;
   stopLoss?: number;
+  createdAt: number;
 }
 
-let open_orders: Order[] = [];
-let balances: Record<string, UserBalances> = {};
-let prices: Record<string, number> = {};
-let bidPrices: Record<string, number> = {};
-let askPrices: Record<string, number> = {};
-
-let lastId = "$";
-
-const CALLBACK_QUEUE = "callback-queue";
-const ENGINE_STREAM = "engine-stream";
-
-function safeNum(n: any, def = 0) {
-  const v = Number(n);
-  return Number.isFinite(v) ? v : def;
+interface Quote {
+  bid: number;
+  ask: number;
+  ts: number;
 }
 
-function getFieldValue(fields: string[], key: string) {
-  for (let i = 0; i < fields.length; i += 2) {
-    if (fields[i] === key) return fields[i + 1];
+/** Requests older than this were already timed out by the API and must not execute. */
+const REQUEST_TTL_MS = 5_000;
+
+const reader = createRedis();
+const writer = createRedis();
+
+const quotes = new Map<AssetSymbol, Quote>();
+const balances = new Map<string, number>();
+const positions = new Map<string, Position>();
+
+const round8 = (n: number) => Math.round(n * 1e8) / 1e8;
+const dec = (n: number) => round8(n).toFixed(8);
+
+function reply(r: EngineReply) {
+  return addToStream(writer, CALLBACK_QUEUE, "data", JSON.stringify(r)).catch((e) =>
+    console.error("[engine] failed to send reply:", e)
+  );
+}
+
+function freshQuote(asset: AssetSymbol): Quote | undefined {
+  const q = quotes.get(asset);
+  return q && Date.now() - q.ts < PRICE_STALE_MS ? q : undefined;
+}
+
+async function getBalance(userId: string): Promise<number> {
+  const cached = balances.get(userId);
+  if (cached !== undefined) return cached;
+  const row = await prisma.asset.findUnique({
+    where: { user_symbol_unique: { userId, symbol: "USDC" } },
+  });
+  const value = row ? Number(row.balance) : 0;
+  balances.set(userId, value);
+  return value;
+}
+
+function positionFromRow(o: any): Position {
+  const openingPrice = Number(o.openingPrice);
+  return {
+    id: o.id,
+    userId: o.userId,
+    asset: o.asset as AssetSymbol,
+    side: o.side as Side,
+    qty: Number(o.qty),
+    leverage: o.leverage,
+    openingPrice,
+    margin: Number(o.margin),
+    liquidationPrice: liquidationPrice(o.side, openingPrice, o.leverage),
+    takeProfit: o.takeProfit != null ? Number(o.takeProfit) : undefined,
+    stopLoss: o.stopLoss != null ? Number(o.stopLoss) : undefined,
+    createdAt: o.createdAt.getTime(),
+  };
+}
+
+async function loadState() {
+  const [assets, open] = await Promise.all([
+    prisma.asset.findMany({ where: { symbol: "USDC" } }),
+    prisma.order.findMany({ where: { status: "open" } }),
+  ]);
+  balances.clear();
+  positions.clear();
+  for (const a of assets) balances.set(a.userId, Number(a.balance));
+  for (const o of open) positions.set(o.id, positionFromRow(o));
+  console.log(`[engine] restored ${balances.size} accounts and ${positions.size} open positions`);
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+
+type CreateOrder = Extract<EngineRequest, { kind: "create-order" }>["payload"];
+
+async function createOrder(p: CreateOrder) {
+  const market = MARKETS[p.asset];
+  const qty = Number(p.qty);
+  const leverage = Math.trunc(Number(p.leverage));
+  if (
+    !market ||
+    (p.side !== "long" && p.side !== "short") ||
+    !Number.isFinite(qty) ||
+    qty < market.minQty ||
+    qty > market.maxQty ||
+    !(leverage >= 1 && leverage <= MAX_LEVERAGE)
+  ) {
+    return reply({ id: p.id, status: "invalid_order", message: "Invalid order parameters" });
   }
-  return undefined;
-}
+  if (positions.has(p.id)) return reply({ id: p.id, status: "created" });
 
-async function updateBalanceInDatabase(userId: string, symbol: string, newBalanceFloat: number) {
-  try {
-    await prisma.asset.upsert({
-      where: { user_symbol_unique: { userId, symbol: symbol as any } },
-      create: {
-        userId,
-        symbol: symbol as any,
-        balance: Math.round(newBalanceFloat * 100), // store cents
-        decimals: 2
-      },
-      update: { balance: Math.round(newBalanceFloat * 100) }
+  const quote = freshQuote(p.asset);
+  if (!quote) {
+    return reply({ id: p.id, status: "no_price", message: `No live price for ${p.asset}` });
+  }
+
+  const openingPrice = p.side === "long" ? quote.ask : quote.bid;
+  const margin = round8((openingPrice * qty) / leverage);
+  const liq = liquidationPrice(p.side, openingPrice, leverage);
+  const tp = p.takeProfit && p.takeProfit > 0 ? Number(p.takeProfit) : undefined;
+  const sl = p.stopLoss && p.stopLoss > 0 ? Number(p.stopLoss) : undefined;
+
+  const wrongSide = (level: number | undefined, mustBeAbove: boolean) =>
+    level !== undefined && (mustBeAbove ? level <= openingPrice : level >= openingPrice);
+  if (wrongSide(tp, p.side === "long") || wrongSide(sl, p.side === "short")) {
+    return reply({
+      id: p.id,
+      status: "invalid_order",
+      message: `Take profit / stop loss is on the wrong side of the fill price ${openingPrice}`,
     });
-    console.log(`Updated ${symbol} balance for ${userId}: ${newBalanceFloat}`);
-  } catch (error) {
-    console.error(`Failed to update balance for ${userId}:`, error);
   }
-}
 
-function getMemBalance(userId: string, symbol: string, snapshot?: Array<{symbol:string; balance:number; decimals:number}>) {
-  if (!balances[userId]) balances[userId] = {};
-  
-  if (snapshot) {
-    const snap = snapshot.find(a => a.symbol === symbol);
-    if (snap) {
-      const decimals = snap.decimals ?? 2;
-      const val = snap.balance / 10 ** decimals;
-      balances[userId][symbol] = val;
-      return val;
-    }
+  const balance = await getBalance(p.userId);
+  if (balance < margin) {
+    return reply({
+      id: p.id,
+      status: "insufficient_balance",
+      message: `Required margin ${margin.toFixed(2)} USDC, free balance ${balance.toFixed(2)} USDC`,
+    });
   }
-  
-  if (balances[userId][symbol] == null) {
-    balances[userId][symbol] = 0;
-  }
-  return balances[userId][symbol]!;
-}
 
-function setMemBalance(userId: string, symbol: string, newVal: number) {
-  if (!balances[userId]) balances[userId] = {};
-  balances[userId][symbol] = newVal;
-  return newVal;
-}
-
-async function createSnapshot() {
+  const newBalance = round8(balance - margin);
+  const createdAt = new Date();
   try {
-    for (const order of open_orders) {
-      const symbol = order.asset;
-      const currentBidPrice = bidPrices[symbol];
-      const currentAskPrice = askPrices[symbol];
-      
-      if (!currentBidPrice || !currentAskPrice) continue;
-
-      let currentPnl = 0;
-      if (currentBidPrice && currentAskPrice) {
-        const currentPriceForOrder = order.side === "long" ? currentBidPrice : currentAskPrice;
-        currentPnl =
-          order.side === "long"
-            ? (currentPriceForOrder - order.openingPrice) * order.qty
-            : (order.openingPrice - currentPriceForOrder) * order.qty;
-      }
-
-      await prisma.order.upsert({
-        where: { id: order.id },
-        update: {
-          side: order.side,
-          pnl: Math.round(currentPnl * 10000),
-          decimals: 4,
-          openingPrice: Math.round(order.openingPrice * 10000),
-          closingPrice: 0,
+    await prisma.$transaction([
+      prisma.asset.upsert({
+        where: { user_symbol_unique: { userId: p.userId, symbol: "USDC" } },
+        create: { userId: p.userId, symbol: "USDC", balance: dec(newBalance) },
+        update: { balance: dec(newBalance) },
+      }),
+      prisma.order.create({
+        data: {
+          id: p.id,
+          userId: p.userId,
+          asset: p.asset,
+          side: p.side,
+          qty: dec(qty),
+          leverage,
+          openingPrice: dec(openingPrice),
+          margin: dec(margin),
+          takeProfit: tp !== undefined ? dec(tp) : null,
+          stopLoss: sl !== undefined ? dec(sl) : null,
           status: "open",
-          qty: Math.round(order.qty * 100),
-          qtyDecimals: 2,
-          leverage: order.leverage || 1,
-          takeProfit: order.takeProfit ? Math.round(order.takeProfit * 10000) : null,
-          stopLoss: order.stopLoss ? Math.round(order.stopLoss * 10000) : null,
-          margin: Math.round((order.openingPrice * order.qty * 100) / (order.leverage || 1)),
+          createdAt,
         },
-        create: {
-          id: order.id,
-          userId: order.userId,
-          side: order.side,
-          pnl: Math.round(currentPnl * 10000),
-          decimals: 4,
-          openingPrice: Math.round(order.openingPrice * 10000),
-          closingPrice: 0,
-          status: "open",
-          qty: Math.round(order.qty * 100),
-          qtyDecimals: 2,
-          leverage: order.leverage || 1,
-          takeProfit: order.takeProfit ? Math.round(order.takeProfit * 10000) : null,
-          stopLoss: order.stopLoss ? Math.round(order.stopLoss * 10000) : null,
-          margin: Math.round((order.openingPrice * order.qty * 100) / (order.leverage || 1)),
-          createdAt: new Date(order.createdAt),
-        } as any,
-      });
-    }
-
-    await checkLiquidations();
-
-    console.log("snapshot sent");
+      }),
+    ]);
   } catch (e) {
-    console.log(e);
+    console.error("[engine] failed to persist order", p.id, e);
+    return reply({ id: p.id, status: "error", message: "Could not persist order" });
   }
+
+  balances.set(p.userId, newBalance);
+  positions.set(p.id, {
+    id: p.id,
+    userId: p.userId,
+    asset: p.asset,
+    side: p.side,
+    qty,
+    leverage,
+    openingPrice,
+    margin,
+    liquidationPrice: liq,
+    takeProfit: tp,
+    stopLoss: sl,
+    createdAt: createdAt.getTime(),
+  });
+  console.log(`[engine] opened ${p.side} ${qty} ${p.asset} @ ${openingPrice} x${leverage} (${p.id})`);
+  return reply({
+    id: p.id,
+    status: "created",
+    data: { openingPrice, margin, liquidationPrice: liq },
+  });
 }
 
-async function processOrderLiquidation(
-  order: Order,
-  currentPriceForOrder: number,
-  context: string = "price-update"
-) {
-  if (!currentPriceForOrder || !Number.isFinite(currentPriceForOrder) || currentPriceForOrder <= 0) {
-    console.log(`${context}: Invalid price for order ${order.id}, skipping liquidation check`);
-    return { liquidated: false, pnl: 0 };
-  }
+async function closePosition(pos: Position, price: number, reason: CloseReason) {
+  // Isolated margin: a position can never lose more than the margin put up for it.
+  const pnl = round8(Math.max(positionPnl(pos.side, pos.openingPrice, price, pos.qty), -pos.margin));
+  const balance = await getBalance(pos.userId);
+  const newBalance = round8(balance + pos.margin + pnl);
 
-  const pnl =
-    order.side === "long"
-      ? (currentPriceForOrder - order.openingPrice) * order.qty
-      : (order.openingPrice - currentPriceForOrder) * order.qty;
-
-  if (!Number.isFinite(pnl)) return { liquidated: false, pnl: 0 };
-
-  let reason: "TakeProfit" | "StopLoss" | "margin" | undefined;
-
-  // TP
-  if (!reason && order.takeProfit && order.takeProfit > 0) {
-    const hit = order.side === "long"
-      ? currentPriceForOrder >= order.takeProfit
-      : currentPriceForOrder <= order.takeProfit;
-    if (hit) {
-      reason = "TakeProfit";
-      console.log(`${context}: Take profit hit for order ${order.id} (${order.side}): price ${currentPriceForOrder} vs TP ${order.takeProfit}`);
-    }
-  }
-
-  // SL
-  if (!reason && order.stopLoss && order.stopLoss > 0) {
-    const hit = order.side === "long"
-      ? currentPriceForOrder <= order.stopLoss
-      : currentPriceForOrder >= order.stopLoss;
-    if (hit) {
-      reason = "StopLoss";
-      console.log(`${context}: Stop loss hit for order ${order.id} (${order.side}): price ${currentPriceForOrder} vs SL ${order.stopLoss}`);
-    }
-  }
-
-  if (!reason && order.leverage) {
-    const initialMargin = (order.openingPrice * order.qty) / order.leverage;
-    const remainingMargin = initialMargin + pnl;
-    const liquidationThreshold = initialMargin * 0.05;
-
-    if (remainingMargin <= liquidationThreshold) {
-      reason = "margin";
-      console.log(`${context} liquidation: order ${order.id} liquidated (remaining: ${remainingMargin}, threshold: ${liquidationThreshold})`);
-    }
-  }
-
-  if (!reason) return { liquidated: false, pnl };
-
-  if (!balances[order.userId]) balances[order.userId] = {};
-
-  if (reason === "margin") {
-    const initialMargin = (order.openingPrice * order.qty) / (order.leverage || 1);
-    const remainingMargin = Math.max(0, initialMargin + pnl);
-    const newBal = setMemBalance(order.userId, "USDC", (balances[order.userId]?.USDC || 0) + remainingMargin);
-    await updateBalanceInDatabase(order.userId, "USDC", newBal);
-    console.log(`Liquidated order ${order.id}: remaining margin = ${remainingMargin}`);
-  } else {
-    const initialMargin = (order.openingPrice * order.qty) / (order.leverage || 1);
-    const credit = initialMargin + pnl;
-    const newBal = setMemBalance(order.userId, "USDC", (balances[order.userId]?.USDC || 0) + credit);
-    await updateBalanceInDatabase(order.userId, "USDC", newBal);
-    console.log(`Closed order ${order.id} (${reason}): returned ${credit}`);
-  }
-
-  try {
-    await prisma.order.update({
-      where: { id: order.id },
+  await prisma.$transaction([
+    prisma.order.update({
+      where: { id: pos.id },
       data: {
         status: "closed",
-        pnl: Math.round(pnl * 10000),
-        closingPrice: Math.round(currentPriceForOrder * 10000),
+        closingPrice: dec(price),
+        pnl: dec(pnl),
+        closeReason: reason,
         closedAt: new Date(),
-        closeReason: reason as any,
       },
-    });
-  } catch (e) {
-    console.log(`error on ${context} closing:`, e);
-  }
+    }),
+    prisma.asset.upsert({
+      where: { user_symbol_unique: { userId: pos.userId, symbol: "USDC" } },
+      create: { userId: pos.userId, symbol: "USDC", balance: dec(newBalance) },
+      update: { balance: dec(newBalance) },
+    }),
+    prisma.transaction.create({
+      data: {
+        userId: pos.userId,
+        type: "RealizedPnl",
+        symbol: "USDC",
+        amount: dec(pnl),
+        balanceAfter: dec(newBalance),
+        orderId: pos.id,
+      },
+    }),
+  ]);
 
-  await client.xadd(
-    CALLBACK_QUEUE,
-    "*",
-    "id", order.id,
-    "status", "closed",
-    "reason", reason,
-    "pnl", pnl.toString()
-  ).catch(err => console.error(`Failed to send ${context} liquidation callback:`, err));
-
-  return { liquidated: true, pnl, reason };
+  balances.set(pos.userId, newBalance);
+  positions.delete(pos.id);
+  console.log(`[engine] closed ${pos.id} (${reason}) @ ${price}, pnl ${pnl.toFixed(2)}`);
+  return { pnl, closingPrice: price };
 }
 
-async function checkLiquidations() {
-  for (let i = open_orders.length - 1; i >= 0; i--) {
-    const order = open_orders[i];
-    if (!order) continue;
-
-    const symbol = order.asset;
-    const currentBidPrice = bidPrices[symbol];
-    const currentAskPrice = askPrices[symbol];
-    // Skip if we don't have valid price data for this asset
-    if (!currentBidPrice || !currentAskPrice) continue;
-
-    const currentPriceForOrder = order.side === "long" ? currentBidPrice : currentAskPrice;
-
-    const result = await processOrderLiquidation(order, currentPriceForOrder, "periodic-check");
-    if (result.liquidated) open_orders.splice(i, 1);
+async function closeOrder(p: { id: string; orderId: string; userId: string }) {
+  const pos = positions.get(p.orderId);
+  if (!pos || pos.userId !== p.userId) {
+    return reply({ id: p.id, status: "order_not_found", message: "Position not found or already closed" });
   }
-}
+  const quote = freshQuote(pos.asset);
+  if (!quote) return reply({ id: p.id, status: "no_price", message: `No live price for ${pos.asset}` });
 
-async function loadSnapshot() {
   try {
-    const dbOrders = await prisma.order.findMany({ where: { status: "open" } });
-
-    open_orders = dbOrders.map((order: any) => ({
-      id: order.id,
-      userId: order.userId,
-      asset: "BTC",
-      side: order.side as "long" | "short",
-      qty: order.qty / 100,
-      leverage: order.leverage,
-      openingPrice: order.openingPrice / 10000,
-      createdAt: order.createdAt.getTime(),
-      status: "open",
-      takeProfit: (order.takeProfit && order.takeProfit > 0) ? order.takeProfit / 10000 : undefined,
-      stopLoss: (order.stopLoss && order.stopLoss > 0) ? order.stopLoss / 10000 : undefined,
-    }));
-
-    console.log(`loaded ${open_orders.length} open orders from the database`);
-    console.log("Order IDs loaded:", open_orders.map((o) => `${o.id.slice(0, 8)}...`));
-
-    balances = {};
+    const result = await closePosition(pos, pos.side === "long" ? quote.bid : quote.ask, "Manual");
+    return reply({ id: p.id, status: "closed", data: result });
   } catch (e) {
-    console.log(e);
+    console.error("[engine] failed to close", pos.id, e);
+    return reply({ id: p.id, status: "error", message: "Could not close position" });
   }
 }
 
-setInterval(createSnapshot, 10000);
+async function deposit(p: { id: string; userId: string; amount: number }) {
+  const amount = round8(Number(p.amount));
+  if (!(amount > 0)) return reply({ id: p.id, status: "invalid_order", message: "Invalid amount" });
 
-async function engine() {
-  console.log("Brumm brum, starting Trading Engine on port 3002");
-  await loadSnapshot();
+  const balance = await getBalance(p.userId);
+  const newBalance = round8(balance + amount);
+  if (newBalance > MAX_DEMO_BALANCE) {
+    return reply({
+      id: p.id,
+      status: "limit_exceeded",
+      message: `Demo accounts are limited to ${MAX_DEMO_BALANCE.toLocaleString("en-US")} USDC`,
+    });
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.asset.upsert({
+        where: { user_symbol_unique: { userId: p.userId, symbol: "USDC" } },
+        create: { userId: p.userId, symbol: "USDC", balance: dec(newBalance) },
+        update: { balance: dec(newBalance) },
+      }),
+      prisma.transaction.create({
+        data: {
+          userId: p.userId,
+          type: "Deposit",
+          symbol: "USDC",
+          amount: dec(amount),
+          balanceAfter: dec(newBalance),
+        },
+      }),
+    ]);
+  } catch (e) {
+    console.error("[engine] failed to persist deposit", e);
+    return reply({ id: p.id, status: "error", message: "Could not persist deposit" });
+  }
+  balances.set(p.userId, newBalance);
+  return reply({ id: p.id, status: "deposited", data: { balance: newBalance } });
+}
+
+/** Checks take-profit, stop-loss and liquidation for every position on this market. */
+async function onPrice(asset: AssetSymbol) {
+  const quote = quotes.get(asset);
+  if (!quote) return;
+  for (const pos of [...positions.values()]) {
+    if (pos.asset !== asset) continue;
+    const mark = pos.side === "long" ? quote.bid : quote.ask;
+    const long = pos.side === "long";
+
+    let reason: CloseReason | undefined;
+    if (pos.takeProfit !== undefined && (long ? mark >= pos.takeProfit : mark <= pos.takeProfit)) {
+      reason = "TakeProfit";
+    } else if (pos.stopLoss !== undefined && (long ? mark <= pos.stopLoss : mark >= pos.stopLoss)) {
+      reason = "StopLoss";
+    } else if (long ? mark <= pos.liquidationPrice : mark >= pos.liquidationPrice) {
+      reason = "Liquidation";
+    }
+    if (!reason) continue;
+
+    try {
+      await closePosition(pos, mark, reason);
+    } catch (e) {
+      console.error(`[engine] failed to auto-close ${pos.id} (${reason})`, e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+
+async function publishStatus() {
+  const status = {
+    ts: Date.now(),
+    positions: positions.size,
+    accounts: balances.size,
+    quotes: Object.fromEntries(quotes),
+  };
+  await writer.set("engine:status", JSON.stringify(status), "EX", 15).catch(() => {});
+}
+
+async function handle(msg: EngineRequest & { sentAt?: number }) {
+  if (msg.kind !== "price-update" && msg.sentAt && Date.now() - msg.sentAt > REQUEST_TTL_MS) {
+    const id = (msg.payload as { id: string }).id;
+    console.warn(`[engine] dropping expired ${msg.kind} request ${id}`);
+    return;
+  }
+  switch (msg.kind) {
+    case "create-order":
+      return createOrder(msg.payload);
+    case "close-order":
+      return closeOrder(msg.payload);
+    case "deposit":
+      return deposit(msg.payload);
+  }
+}
+
+async function run() {
+  // Start after the current tail so requests from before a restart are never replayed.
+  const tail = await reader.xrevrange(ENGINE_STREAM, "+", "-", "COUNT", 1);
+  let lastId = tail[0]?.[0] ?? "0-0";
+
+  await loadState();
+  setInterval(publishStatus, 2000);
+  console.log("[engine] ready");
 
   while (true) {
     try {
-      const response = await client.xread("BLOCK", 0, "STREAMS", ENGINE_STREAM, lastId);
-      if (!response || !response.length) continue;
+      const res = await reader.xread("COUNT", 500, "BLOCK", 5000, "STREAMS", ENGINE_STREAM, lastId);
+      if (!res) continue;
+      const touched = new Set<AssetSymbol>();
 
-      const [, messages] = response[0]!;
-      if (!messages || !messages.length) continue;
-
-      for (const [id, fields] of messages) {
+      for (const [id, fields] of res[0]![1]) {
         lastId = id;
-        const raw = getFieldValue(fields as string[], "data");
+        const raw = fields[fields.indexOf("data") + 1];
         if (!raw) continue;
-
-        let msg: any;
+        let msg: EngineRequest & { sentAt?: number };
         try {
           msg = JSON.parse(raw);
-          // console.log(`[ENGINE] Received:`, msg);
         } catch {
-          console.log(`[ENGINE] Failed to parse:`, raw);
           continue;
         }
 
-        const { kind, payload } = msg.request || msg;
-
-        switch (kind) {
-          case "price-update": {
-            const data = payload?.data || payload;
-            if (data && data.s) {
-              const s = typeof data.s === "string" ? data.s : "";
-              const rawSymbol = s.endsWith("_USDC") ? s.replace("_USDC", "") : s;
-              const symbol = rawSymbol.toUpperCase();
-              const bidPrice = safeNum(data.b, 0);
-              const askPrice = safeNum(data.a, 0);
-
-              if (bidPrice > 0 && askPrice > 0) {
-                const currentPrice = (bidPrice + askPrice) / 2;
-                prices[symbol] = currentPrice;
-                bidPrices[symbol] = bidPrice;
-                askPrices[symbol] = askPrice;
-                console.log(`[ENGINE] Price updated: ${symbol} = ${currentPrice.toFixed(2)} (bid ${bidPrice.toFixed(2)}, ask ${askPrice.toFixed(2)})`);
-
-                for (let i = open_orders.length - 1; i >= 0; i--) {
-                  const order = open_orders[i];
-                  if (!order || order.asset !== symbol) continue;
-
-                  const curr = order.side === "long" ? bidPrice : askPrice;
-                  const result = await processOrderLiquidation(order, curr, "price-update");
-                  if (result.liquidated) open_orders.splice(i, 1);
-                }
-              }
-            }
-            break;
+        if (msg.kind === "price-update") {
+          const { symbol, bid, ask, ts } = msg.payload;
+          if (MARKETS[symbol] && bid > 0 && ask >= bid) {
+            quotes.set(symbol, { bid, ask, ts: ts || Date.now() });
+            touched.add(symbol);
           }
-
-          case "create-order": {
-            console.log(`[ENGINE] Processing create-order:`, payload);
-            const {
-              id: orderId,
-              userId,
-              asset: rawAsset,
-              side: rawSide,
-              qty,
-              leverage,
-              balanceSnapshot,
-              takeProfit,
-              stopLoss,
-            } = payload ?? {};
-
-            const asset = rawAsset ? rawAsset.toUpperCase() : "";
-            const side = rawSide as "long" | "short";
-
-            const q = safeNum(qty, NaN);
-            const lev = safeNum(leverage, 1);
-            if (!userId || !asset || !side || !orderId || !Number.isFinite(q) || q <= 0) {
-              console.log("missing/invalid fields", { orderId, userId, asset, q, side });
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId || "unknown", "status", "invalid_order")
-                .catch(err => console.error("Failed to send invalid_order:", err));
-              break;
-            }
-
-            if (open_orders.some(o => o.id === orderId)) {
-              console.log(`[ENGINE] Duplicate create-order ${orderId} ignored`);
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId, "status", "created")
-                .catch(err => console.error("Failed to send created callback:", err));
-              break;
-            }
-
-            const bidPrice = bidPrices[asset];
-            const askPrice = askPrices[asset];
-            if (!bidPrice || !askPrice) {
-              console.log("no price available", { orderId, asset, availablePrices: Object.keys(bidPrices) });
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId, "status", "no_price")
-                .catch(err => console.error("Failed to send no_price:", err));
-              break;
-            }
-
-            const openingPrice = side === "long" ? askPrice : bidPrice;
-            const requiredMargin = (openingPrice * q) / (lev || 1);
-
-            const usdc = getMemBalance(userId, "USDC", balanceSnapshot);
-            console.log(`[ENGINE] Balance check for order ${orderId}:`, {
-              userId,
-              usdc,
-              requiredMargin,
-              openingPrice,
-              qty: q,
-              leverage: lev,
-              hasEnoughBalance: usdc >= requiredMargin
-            });
-            
-            if (usdc >= requiredMargin) {
-              const newBal = setMemBalance(userId, "USDC", usdc - requiredMargin);
-              await updateBalanceInDatabase(userId, "USDC", newBal);
-
-              const order: Order = {
-                id: orderId,
-                userId,
-                asset,
-                side,
-                qty: q,
-                leverage: lev || 1,
-                openingPrice,
-                createdAt: Date.now(),
-                status: "open",
-                takeProfit: (takeProfit != null && Number.isFinite(Number(takeProfit)) && Number(takeProfit) > 0) ? Number(takeProfit) : undefined,
-                stopLoss: (stopLoss != null && Number.isFinite(Number(stopLoss)) && Number(stopLoss) > 0) ? Number(stopLoss) : undefined,
-              };
-
-              open_orders.push(order);
-              console.log(`Order created: ${orderId} for user ${userId}`, {
-                side: order.side,
-                qty: order.qty,
-                openingPrice: order.openingPrice,
-                leverage: order.leverage,
-                takeProfit: order.takeProfit ? order.takeProfit : "not set",
-                stopLoss: order.stopLoss ? order.stopLoss : "not set",
-                createdAt: new Date(order.createdAt).toISOString()
-              });
-
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId, "status", "created")
-                .catch(err => console.error("Failed to send created callback:", err));
-            } else {
-              console.log("Insufficient balance", { orderId, userId, requiredMargin, usdc });
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId, "status", "insufficient_balance")
-                .catch(err => console.error("Failed to send insufficient_balance:", err));
-            }
-            break;
-          }
-
-          case "close-order": {
-            console.log(`[ENGINE] Processing close-order:`, payload);
-            const { orderId, userId, closeReason, pnl } = payload ?? {};
-            if (!orderId || !userId) {
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId || "unknown", "status", "invalid_close_request")
-                .catch(err => console.error("Failed to send invalid_close_request:", err));
-              break;
-            }
-
-            const idx = open_orders.findIndex(o => o.id === orderId && o.userId === userId);
-            if (idx === -1) {
-              await client.xadd(CALLBACK_QUEUE, "*", "id", orderId, "status", "order_not_found")
-                .catch(err => console.error("Failed to send order_not_found:", err));
-              break;
-            }
-
-            const order = open_orders[idx]!;
-            const symbol = order.asset;
-
-            let finalPnl: number | undefined = Number.isFinite(Number(pnl)) ? Number(pnl) : undefined;
-            let closingPrice = 0;
-
-            if (finalPnl === undefined) {
-              const currentBidPrice = bidPrices[symbol];
-              const currentAskPrice = askPrices[symbol];
-
-              if (currentBidPrice && currentAskPrice) {
-                const currentPriceForOrder = order.side === "long" ? currentBidPrice : currentAskPrice;
-                closingPrice = currentPriceForOrder;
-                finalPnl = order.side === "long"
-                  ? (currentPriceForOrder - order.openingPrice) * order.qty
-                  : (order.openingPrice - currentPriceForOrder) * order.qty;
-              } else {
-                closingPrice = order.openingPrice;
-                finalPnl = 0;
-                console.log(`No price available for ${symbol} when closing order ${order.id}, using opening price`);
-              }
-            }
-
-            if (!balances[userId]) balances[userId] = {};
-            const initialMargin = (order.openingPrice * order.qty) / (order.leverage || 1);
-            const newBal = setMemBalance(userId, "USDC", (balances[userId].USDC || 0) + initialMargin + (finalPnl || 0));
-            await updateBalanceInDatabase(userId, "USDC", newBal);
-
-            try {
-              await prisma.order.update({
-                where: { id: orderId },
-                data: {
-                  status: "closed",
-                  pnl: Math.round((finalPnl || 0) * 10000),
-                  closingPrice: Math.round((closingPrice || order.openingPrice) * 10000),
-                  closedAt: new Date(),
-                  closeReason: (closeReason || "Manual") as any,
-                },
-              });
-            } catch (e) {
-              console.log("error on manual closing", e);
-            }
-
-            open_orders.splice(idx, 1);
-
-            await client.xadd(
-              CALLBACK_QUEUE,
-              "*",
-              "id", orderId,
-              "status", "closed",
-              "reason", (closeReason || "Manual"),
-              "pnl", String(finalPnl || 0)
-            ).catch(err => console.error("Failed to send close success callback:", err));
-
-            break;
-          }
-
-          default:
-            break;
+          continue;
         }
+
+        // Evaluate triggers on the latest prices before acting on a user request.
+        for (const s of touched) await onPrice(s);
+        touched.clear();
+        await handle(msg);
       }
+
+      for (const s of touched) await onPrice(s);
     } catch (e) {
-      console.error("engine-loop error:", e);
+      console.error("[engine] loop error:", e);
+      await new Promise((r) => setTimeout(r, 1000));
     }
   }
 }
 
-engine();
+run().catch((e) => {
+  console.error("[engine] fatal:", e);
+  process.exit(1);
+});

@@ -4,16 +4,15 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "start": "turbo run start",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "start:api": "cd apps/api-service && pnpm start",
-    "start:engine": "cd apps/engine-service && pnpm start",
-    "start:price-poller": "cd apps/price-poller-service && pnpm start",
-    "dev:api": "cd apps/api-service && pnpm dev",
-    "dev:engine": "cd apps/engine-service && pnpm dev",
-    "dev:price-poller": "cd apps/price-poller-service && pnpm dev"
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "db:migrate": "pnpm --filter @repo/prisma migrate:deploy",
+    "dev:api": "pnpm --filter api-service dev",
+    "dev:engine": "pnpm --filter engine-service dev",
+    "dev:price-poller": "pnpm --filter price-poller-service dev",
+    "dev:web": "pnpm --filter web dev",
+    "start": "bash scripts/start.sh"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

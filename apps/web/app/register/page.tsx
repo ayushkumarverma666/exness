@@ -1,136 +1,68 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { toast } from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "../hooks/useAuth";
+import { AuthShell, Field } from "../components/site/AuthShell";
 
-const RegisterPage = () => {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const { registerMutation } = useAuth();
-    const router = useRouter();
+function RegisterForm() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  const { register } = useAuth();
+  const router = useRouter();
+  const next = useSearchParams().get("next") || "/trade";
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    register.mutate({ name, email, password }, { onSuccess: () => router.push(next) });
+  };
 
-        if (!name || !email || !password) {
-            toast.error('Please fill in all fields');
-            return;
-        }
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <Field label="Full name" autoComplete="name" required minLength={2} value={name} onChange={(e) => setName(e.target.value)} />
+      <Field label="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Field
+        label="Password"
+        type="password"
+        autoComplete="new-password"
+        required
+        minLength={8}
+        hint="At least 8 characters, including a letter and a number."
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <label className="flex items-start gap-2 text-xs text-muted">
+        <input type="checkbox" className="mt-0.5 accent-[#5b82ff]" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+        <span>
+          I understand that leveraged trading is high risk and that this is a demo account funded with virtual USDC.{" "}
+          <Link href="/help#risk" className="text-accent">Risk disclosure</Link>
+        </span>
+      </label>
+      <button
+        disabled={register.isPending || !accepted}
+        className="w-full rounded-md bg-accent py-2.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+      >
+        {register.isPending ? "Creating account…" : "Create account"}
+      </button>
+      <p className="text-center text-sm text-muted">
+        Already have an account?{" "}
+        <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-accent">
+          Log in
+        </Link>
+      </p>
+    </form>
+  );
+}
 
-        if (password.length < 6) {
-            toast.error('Password must be at least 6 characters long');
-            return;
-        }
-
-        try {
-            await registerMutation.mutateAsync({ name, email, password });
-            router.push('/');
-        } catch (error) {
-            console.error('Registration error:', error);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-white flex items-center justify-center px-4">
-            <div className="max-w-md w-full mx-auto">
-                <div className="text-center mb-2">
-                    <h1 className="text-4xl md:text-5xl font-medium text-black leading-tight mb-4 font-dm-sans tracking-tighter">
-                        Join <span className="italic font-instrument-serif tracking-normal">exness</span>
-                    </h1>
-                    <p className="text-sm md:text-md text-black mb-4 leading-relaxed font-ibm-plex-mono">
-                        Start your trading journey with limitless opportunities
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-black mb-2 font-dm-sans">
-                            Full Name
-                        </label>
-                        <input
-                            type="text"
-                            id="name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-black rounded-lg focus:outline-none focus:border-gray-600 transition-colors font-dm-sans bg-white"
-                            placeholder="Enter your full name"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-black mb-2 font-dm-sans">
-                            Email Address
-                        </label>
-                        <input
-                            type="email"
-                            id="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-black rounded-lg focus:outline-none focus:border-gray-600 transition-colors font-dm-sans bg-white"
-                            placeholder="Enter your email"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-black mb-2 font-dm-sans">
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            id="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-black rounded-lg focus:outline-none focus:border-gray-600 transition-colors font-dm-sans bg-white"
-                            placeholder="Enter your password (min. 6 characters)"
-                            required
-                            minLength={6}
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={registerMutation.isPending}
-                        className="w-full bg-black text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors font-dm-sans font-medium text-lg border-2 border-black cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {registerMutation.isPending ? 'Creating Account...' : 'Create Account'}
-                    </button>
-                </form>
-
-                <div className="mt-8 text-center">
-                    <p className="text-sm text-black font-dm-sans">
-                        Already have an account?{' '}
-                        <Link
-                            href="/login"
-                            className="font-medium hover:text-gray-700 transition-colors underline"
-                        >
-                            Sign in
-                        </Link>
-                    </p>
-                </div>
-
-                <div className="mt-6 text-center">
-                    <Link
-                        href="/"
-                        className="text-sm text-black hover:text-gray-700 transition-colors font-dm-sans underline"
-                    >
-                        ← Back to Home
-                    </Link>
-                </div>
-
-                <div className="mt-6 text-center">
-                    <p className="text-xs text-gray-600 font-dm-sans leading-relaxed">
-                        By creating an account, you agree to our Terms of Service and Privacy Policy
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default RegisterPage;
+export default function RegisterPage() {
+  return (
+    <AuthShell title="Open your account" subtitle="Get 10,000 USDC in demo funds and start trading in under a minute.">
+      <Suspense>
+        <RegisterForm />
+      </Suspense>
+    </AuthShell>
+  );
+}

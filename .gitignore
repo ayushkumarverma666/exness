@@ -36,3 +36,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+*.tsbuildinfo
+
+# Local Redis snapshots
+dump.rdb
