@@ -151,7 +151,7 @@ export function TerminalHeader({ symbol, onSymbol }: { symbol: AssetSymbol; onSy
   const [depositOpen, setDepositOpen] = useState(false);
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-3 sm:gap-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-bg px-3 sm:gap-4">
       <div className="hidden md:block">
         <Logo />
       </div>
