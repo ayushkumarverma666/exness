@@ -4,7 +4,6 @@ import { Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isAssetSymbol, type AssetSymbol } from "../lib/markets";
 import { TerminalHeader } from "../components/terminal/TerminalHeader";
-import { Watchlist } from "../components/terminal/Watchlist";
 import { PriceChart } from "../components/terminal/PriceChart";
 import { MarketDepth } from "../components/terminal/MarketDepth";
 import { OrderTicket } from "../components/terminal/OrderTicket";
@@ -21,36 +20,33 @@ function Terminal() {
   return (
     <div className="flex min-h-screen flex-col bg-bg lg:h-screen lg:overflow-hidden">
       <TerminalHeader symbol={symbol} onSymbol={select} />
+
+      {/*
+        One tree, rearranged with grid areas:
+        mobile  chart / ticket / book / panel (stacked)
+        lg      chart+panel on the left, ticket full height on the right (book hidden)
+        xl      chart | book | ticket on top, panel under chart and book
+      */}
       <div
-        className="grid flex-1 grid-cols-[minmax(0,1fr)] gap-px bg-line lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_260px_300px] min-[1800px]:grid-cols-[230px_minmax(0,1fr)_270px_310px]"
+        className={[
+          "grid flex-1 gap-1 bg-bg p-1",
+          "grid-cols-[minmax(0,1fr)] [grid-template-areas:'chart'_'ticket'_'book'_'panel']",
+          "lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[minmax(0,1fr)_clamp(220px,34vh,340px)]",
+          "lg:[grid-template-areas:'chart_ticket'_'panel_ticket']",
+          "xl:grid-cols-[minmax(0,1fr)_280px_320px] xl:[grid-template-areas:'chart_book_ticket'_'panel_panel_ticket']",
+        ].join(" ")}
       >
-        <div className="hidden min-h-0 min-[1800px]:block">
-          <Watchlist symbol={symbol} onSelect={select} />
+        <div className="h-[55vh] min-h-[360px] [grid-area:chart] overflow-hidden rounded-lg border border-line lg:h-auto lg:min-h-0">
+          <PriceChart symbol={symbol} />
         </div>
-
-        <div className="flex min-h-0 flex-col gap-px">
-          <div className="h-[420px] lg:h-auto lg:min-h-0 lg:flex-1">
-            <PriceChart symbol={symbol} />
-          </div>
-          <div className="hidden h-[260px] shrink-0 lg:block">
-            <AccountPanel onSelect={select} />
-          </div>
-        </div>
-
-        <div className="hidden min-h-0 xl:block">
+        <div className="h-[420px] [grid-area:book] overflow-hidden rounded-lg border border-line lg:hidden xl:block xl:h-auto xl:min-h-0">
           <MarketDepth symbol={symbol} />
         </div>
-
-        <div className="min-h-0">
-          <OrderTicket symbol={symbol} />
-        </div>
-
-        {/* Stacked panels for smaller screens */}
-        <div className="h-[420px] xl:hidden lg:hidden">
-          <MarketDepth symbol={symbol} />
-        </div>
-        <div className="h-[360px] lg:hidden">
+        <div className="h-[380px] [grid-area:panel] overflow-hidden rounded-lg border border-line lg:h-auto lg:min-h-0">
           <AccountPanel onSelect={select} />
+        </div>
+        <div className="[grid-area:ticket] overflow-hidden rounded-lg border border-line lg:min-h-0">
+          <OrderTicket symbol={symbol} />
         </div>
       </div>
     </div>
