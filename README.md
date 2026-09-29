@@ -57,58 +57,48 @@ pnpm dev:web                                # http://localhost:3200
 
 Or run the production image locally, with Postgres included: `docker compose up --build`, then open http://localhost:7860.
 
-## Deploy for free
+## Deploy for free (no credit card)
 
-The whole platform (web, API, engine, price feed and Redis) runs in **one Docker container** built by the root
-`Dockerfile`. The only external dependency is Postgres.
+The recommended free setup has three parts: **Vercel** hosts the website, **Render** hosts the backend and **Neon**
+hosts the database. None of them asks for a card.
 
-### 1. Database: Neon (free)
+### 1. Database: Neon
 
 1. Sign up at [neon.tech](https://neon.tech) and create a project.
 2. Copy the connection string, e.g. `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`.
 
-Migrations run automatically every time the container starts.
+Migrations run automatically every time the backend starts.
 
-### 2. App: Hugging Face Spaces (free CPU: 2 vCPU, 16 GB RAM)
+### 2. Backend: Render (free web service)
 
-1. Go to [huggingface.co/new-space](https://huggingface.co/new-space) and choose **Docker**, then **Blank**, on the free **CPU basic** hardware.
-2. In the Space's **Settings → Variables and secrets**, add these **secrets**:
+1. Sign up at [render.com](https://render.com) with GitHub.
+2. Click **New → Blueprint** and pick this repository. Render reads `render.yaml` and creates the `velora-api` service.
+   It uses `Dockerfile.backend` and runs the API, engine, price feed and Redis in one container.
+3. When asked, paste your Neon string as `DATABASE_URL`. `JWT_SECRET` is generated for you.
+4. Wait for the deploy, then open `https://velora-api-xxxx.onrender.com/health`. It should show `"status":"ok"`.
 
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | your Neon connection string |
-   | `JWT_SECRET` | a random string of 32+ characters (`openssl rand -hex 32`) |
-   | `SITE_URL` | optional: `https://<user>-<space>.hf.space` |
+### 3. Website: Vercel (Hobby plan)
 
-3. Push the code to the Space. You can either:
-   - **Automatic (recommended):** in this GitHub repo, add the secret `HF_TOKEN` (a Hugging Face *write* token) and the
-     variable `HF_SPACE` (`your-name/your-space`). Every push to `main` then deploys through
-     `.github/workflows/deploy-huggingface.yml`.
-   - **Manual:** add the Space as a git remote and push. The Space's README must start with the front matter below,
-     which the workflow adds for you:
+1. Sign up at [vercel.com](https://vercel.com) with GitHub and click **Add New → Project**. Import this repository.
+2. Set **Root Directory** to `apps/web`. Vercel detects Next.js and pnpm.
+3. Add the environment variable `API_INTERNAL_URL` = your Render URL (e.g. `https://velora-api-xxxx.onrender.com`).
+4. Deploy. Your site is at `https://<project>.vercel.app`.
 
-     ```yaml
-     ---
-     title: Velora
-     sdk: docker
-     app_port: 7860
-     ---
-     ```
-
-4. The Space builds the image (~5 minutes) and serves the app at `https://<user>-<space>.hf.space`.
+Vercel proxies `/api/*` to Render, so the browser only talks to your Vercel domain and login cookies are first-party.
 
 **Good to know**
-- Free Spaces go to sleep after about 48 hours without visitors and wake on the next visit. All state lives in Postgres,
-  and the engine restores open positions when it starts, so nothing is lost. Take-profit, stop-loss and liquidation are
-  not checked while the Space is asleep.
-- The Space's disk is temporary. That's fine here, because Redis only carries in-flight messages.
-- Use the direct `*.hf.space` URL rather than the embedded huggingface.co page. Inside the iframe, the app falls back
-  to bearer tokens because browsers block third-party cookies.
+- Render's free service sleeps after about 15 minutes without requests. The first visit after that takes about a
+  minute while it wakes. All state lives in Postgres and the engine restores open positions on start, so nothing is
+  lost. Take-profit, stop-loss and liquidation are not checked while the backend is asleep.
+- Every push to `main` redeploys both Vercel and Render automatically.
 
-### Alternative: web on Vercel, API elsewhere
+### Alternative: one container (Hugging Face Spaces, any VPS)
 
-The web app also works on Vercel with `NEXT_PUBLIC_API_URL=https://your-api-host`. On the API, set
-`CORS_ORIGINS=https://your-app.vercel.app` and `COOKIE_SAMESITE=none`.
+The root `Dockerfile` runs everything, website included, in one container on port 7860. On a VPS, run
+`docker compose up --build`. For a Hugging Face Docker Space, add `DATABASE_URL` and `JWT_SECRET` as Space secrets.
+Then add the GitHub secret `HF_TOKEN` (a write token) and the variable `HF_SPACE` (`user/space`), and
+`.github/workflows/deploy-huggingface.yml` deploys every push to `main`. Some Hugging Face accounts have a free CPU
+quota of 0; in that case the Space stays paused until Hugging Face raises it.
 
 ## Environment variables
 
